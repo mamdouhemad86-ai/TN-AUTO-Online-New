@@ -15,24 +15,41 @@ async function cloudSelect(table){
 }
 async function cloudReplace(table, rows){
   if(!onlineMode) return;
-  const {error}=await sb.from(table).delete().neq('id',0);
-  if(error) throw error;
-  if(rows && rows.length){
-    const {error:e}=await sb.from(table).insert(rows);
+  const clean=cleanRowsFor(table,rows||[]);
+  // Sync without deleting everything first. This prevents a temporary
+  // network/validation error from wiping the cloud table.
+  if(clean.length){
+    const {error:e}=await sb.from(table).upsert(clean,{onConflict:'id'});
     if(e) throw e;
+  }
+  const ids=clean.map(r=>r.id).filter(v=>v!==undefined&&v!==null);
+  if(ids.length){
+    const {data:existing,error:q}=await sb.from(table).select('id');
+    if(q) throw q;
+    const keep=new Set(ids.map(String));
+    const stale=(existing||[]).map(r=>r.id).filter(id=>!keep.has(String(id)));
+    for(const id of stale){ const {error:d}=await sb.from(table).delete().eq('id',id); if(d) throw d; }
+  }else{
+    const {error:d}=await sb.from(table).delete().neq('id',0);
+    if(d) throw d;
   }
 }
 function applyCloudSnapshot(s){
   if(!s) return;
   const hasCloud = Object.values(s).some(v=>Array.isArray(v)&&v.length);
   if(!hasCloud) return false;
-  if(s.cars.length) S['العربيات']=s.cars.map(r=>({id:r.id,'العربية':r.name||'', 'الموديل':r.model||'', 'السنة':r.year||'', 'سعر الشراء':Number(r.purchase_price)||0, 'عمولة الشراء':Number(r.purchase_commission)||0, 'سعر البيع':r.sale_price==null?'':Number(r.sale_price), 'عمولة البيع':Number(r.sale_commission)||0, 'حالة البيع':r.status==='sold'?'مباع':'متاح', 'المورد':r.supplier||'', 'هاتف المورد':r.supplier_phone||'', 'اسم المشتري':r.customer_name||'', 'هاتف المشتري':r.customer_phone||'', 'ملاحظات':r.notes||'', 'تاريخ الشراء':r.purchased_at||'', 'تاريخ البيع':r.sold_at||''}));
-  if(s.partners.length) S['الشركاء']=s.partners.map(r=>({id:r.id,'الشريك':r.name||'', 'إجمالي المبلغ المسجل':Number(r.capital)||0}));
-  if(s.contrib.length) S['مساهمات العربيات']=s.contrib.map(r=>({id:r.id,'car_id':r.car_id,'الشريك':r.partner_name||'', 'المبلغ':Number(r.amount)||0,'partner_id':r.partner_id||null}));
-  if(s.cash.length) S['حركة الخزنة']=s.cash.map(r=>({id:r.id,'التاريخ':r.transaction_date||'', 'نوع الحركة':r.type==='income'?'دخل':'مصروف','العربية/البند':r.description||'', 'المبلغ':Number(r.amount)||0,'داخل':r.type==='income'?Number(r.amount)||0:0,'خارج':r.type==='expense'?Number(r.amount)||0:0,'ملاحظات':r.description||''}));
-  if(s.requests.length) S['طلبات العملاء']=s.requests.map(r=>({id:r.id,'اسم العميل':r.customer_id||'', 'السيارة المطلوبة':r.desired_make||'', 'الموديل':r.desired_model||'', 'السنة من':r.desired_year_from||'', 'السنة إلى':r.desired_year_to||'', 'الميزانية من':r.budget_min||0,'الميزانية إلى':r.budget_max||0,'اللون':r.color||'', 'ملاحظات':r.notes||'', 'الحالة':r.status||''}));
-  if(s.employees.length) S['الموظفين']=s.employees.map(r=>({id:r.id,'الموظف':r.name||'', 'الوظيفة':r.job_title||'', 'رقم الهاتف':r.phone||'', 'الراتب الشهري':Number(r.monthly_salary)||0,'تاريخ التعيين':r.hire_date||'', 'الحالة':r.status==='inactive'?'غير نشط':'نشط','ملاحظات':r.notes||''}));
-  if(s.employee_transactions.length) { const names=new Map(s.employees.map(e=>[e.id,e.name])); S['حركة الموظفين']=s.employee_transactions.map(r=>({id:r.id,'الموظف':names.get(r.employee_id)||'', 'نوع الحركة':({'salary':'راتب','advance':'سلفة','bonus':'مكافأة','deduction':'خصم','expense':'مصروف'})[r.type]||r.type,'المبلغ':Number(r.amount)||0,'التاريخ':r.transaction_date||'', 'البيان':r.description||''})); }
+  if(Array.isArray(s.cars)) S['العربيات']=s.cars.map(r=>({id:r.id,'العربية':r.name||'', 'الموديل':r.model||'', 'السنة':r.year||'', 'سعر الشراء':Number(r.purchase_price)||0, 'عمولة الشراء':Number(r.purchase_commission)||0, 'سعر البيع':r.sale_price==null?'':Number(r.sale_price), 'عمولة البيع':Number(r.sale_commission)||0, 'حالة البيع':r.status==='sold'?'مباع':'متاح', 'المورد':r.supplier||'', 'هاتف المورد':r.supplier_phone||'', 'اسم المشتري':r.customer_name||'', 'هاتف المشتري':r.customer_phone||'', 'ملاحظات':r.notes||'', 'تاريخ الشراء':r.purchased_at||'', 'تاريخ البيع':r.sold_at||''}));
+  if(Array.isArray(s.partners)) S['الشركاء']=s.partners.map(r=>({id:r.id,'الشريك':r.name||'', 'إجمالي المبلغ المسجل':Number(r.capital)||0}));
+  if(Array.isArray(s.contrib)) {
+    S['مساهمات العربيات']=s.contrib.map(r=>({id:r.id,'car_id':r.car_id,'الشريك':r.partner_name||'', 'المبلغ':Number(r.amount)||0,'partner_id':r.partner_id||null}));
+    const byCar=new Map();
+    S['مساهمات العربيات'].forEach(r=>{ const k=String(r.car_id); if(!byCar.has(k))byCar.set(k,[]); byCar.get(k).push(r); });
+    S['العربيات'].forEach(c=>{ const rows=byCar.get(String(c.id))||[]; c['مساهمات الشركاء']=rows.map(r=>`${r['الشريك']}: ${r['المبلغ']}`).join(' | '); });
+  }
+  if(Array.isArray(s.cash)) S['حركة الخزنة']=s.cash.map(r=>({id:r.id,'التاريخ':r.transaction_date||'', 'نوع الحركة':r.type==='income'?'دخل':'مصروف','العربية/البند':r.description||'', 'المبلغ':Number(r.amount)||0,'داخل':r.type==='income'?Number(r.amount)||0:0,'خارج':r.type==='expense'?Number(r.amount)||0:0,'ملاحظات':r.description||''}));
+  if(Array.isArray(s.requests)) S['طلبات العملاء']=s.requests.map(r=>({id:r.id,'اسم العميل':r.customer_id||'', 'السيارة المطلوبة':r.desired_make||'', 'الموديل':r.desired_model||'', 'السنة من':r.desired_year_from||'', 'السنة إلى':r.desired_year_to||'', 'الميزانية من':r.budget_min||0,'الميزانية إلى':r.budget_max||0,'اللون':r.color||'', 'ملاحظات':r.notes||'', 'الحالة':r.status||''}));
+  if(Array.isArray(s.employees)) S['الموظفين']=s.employees.map(r=>({id:r.id,'الموظف':r.name||'', 'الوظيفة':r.job_title||'', 'رقم الهاتف':r.phone||'', 'الراتب الشهري':Number(r.monthly_salary)||0,'تاريخ التعيين':r.hire_date||'', 'الحالة':r.status==='inactive'?'غير نشط':'نشط','ملاحظات':r.notes||''}));
+  if(Array.isArray(s.employee_transactions)) { const names=new Map(s.employees.map(e=>[e.id,e.name])); S['حركة الموظفين']=s.employee_transactions.map(r=>({id:r.id,'الموظف':names.get(r.employee_id)||'', 'نوع الحركة':({'salary':'راتب','advance':'سلفة','bonus':'مكافأة','deduction':'خصم','expense':'مصروف'})[r.type]||r.type,'المبلغ':Number(r.amount)||0,'التاريخ':r.transaction_date||'', 'البيان':r.description||''})); }
   localStorage.setItem(KEY,JSON.stringify(S));
   return true;
 }
@@ -140,6 +157,7 @@ async function syncLocalToCloud(){
     cloudReplace('partners',partners),
     cloudReplace('car_contributions',contrib),
     cloudReplace('cash_transactions',cash),
+    cloudReplace('vehicle_requests',A('طلبات العملاء').map((r,i)=>({id:Number(r.id)||i+1,customer_id:r['اسم العميل']||null,desired_make:r['السيارة المطلوبة']||null,desired_model:r['الموديل']||null,desired_year_from:Number(r['السنة من'])||null,desired_year_to:Number(r['السنة إلى'])||null,budget_min:Number(r['الميزانية من'])||0,budget_max:Number(r['الميزانية إلى']||r['الميزانية'])||0,color:r['اللون']||null,notes:r['ملاحظات']||null,status:r['الحالة']||'active'}))),
     cloudReplace('employees',employees),
     cloudReplace('employee_transactions',employeeTx)
   ]);
@@ -351,6 +369,24 @@ function modal(type,data=null,index=null,sheet=null){ctx={type,index,sheet:sheet
  }
 }
 function closeModal(){modalbox.classList.add('hidden');ctx=null}
+function nextLocalId(sheet){
+ const rows=A(sheet); return rows.reduce((m,r)=>Math.max(m,Number(r.id)||0),0)+1;
+}
+function rebuildCarContributions(){
+ const old=A('مساهمات العربيات'); const oldMap=new Map(old.map(r=>[String(r.car_id)+'|'+String(r.partner_id||r['الشريك']||''),r]));
+ const out=[];
+ for(const car of A('العربيات')){
+   const raw=String(car['مساهمات الشركاء']||'');
+   raw.split('|').map(x=>x.trim()).filter(Boolean).forEach(part=>{
+     const m=part.match(/^(.+?):\s*([\d.,]+)/); if(!m)return;
+     const name=m[1].trim(), amount=Number(m[2].replace(/,/g,''))||0; if(amount<=0)return;
+     const partner=A('الشركاء').find(p=>String(p['الشريك'])===name);
+     const key=String(car.id)+'|'+String(partner?.id||name); const prev=oldMap.get(key);
+     out.push({id:Number(prev?.id)||nextLocalId('مساهمات العربيات')+out.length,car_id:Number(car.id),الشريك:name,المبلغ:amount,partner_id:Number(partner?.id)||null});
+   });
+ }
+ S['مساهمات العربيات']=out;
+}
 function saveModal(){
  let obj={};fields[ctx.type].forEach(([l])=>obj[l]=document.getElementById('f_'+l).value);
  if(ctx.type==='car'){
@@ -383,7 +419,7 @@ function saveModal(){
  const isNew=ctx.index==null;
  if(ctx.type==='employee' && !obj['الموظف']) return alert('اكتب اسم الموظف');
  if(ctx.type==='employee_tx' && (!obj['الموظف'] || !(Number(obj['المبلغ'])>0))) return alert('اختار الموظف واكتب مبلغ صحيح');
- if(isNew)a.push(obj);else a[ctx.index]=obj;
+ if(isNew){ if(ctx.type==='car' && !obj.id)obj.id=nextLocalId('العربيات'); a.push(obj); }else{ obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet); a[ctx.index]=obj; }
  if(ctx.type==='employee_tx' && isNew){ const amt=Number(obj['المبلغ'])||0; const typeMap={'راتب':'راتب موظف','سلفة':'سلفة موظف','مكافأة':'مكافأة موظف','خصم':'خصم موظف','مصروف':'مصروف موظف'}; const cash=A('حركة الخزنة'),oldBal=cashBalance(); const out=['راتب','سلفة','مكافأة','مصروف'].includes(obj['نوع الحركة'])?amt:0; const inn=obj['نوع الحركة']==='خصم'?amt:0; cash.push({'التاريخ':obj['التاريخ']||new Date().toISOString().slice(0,10),'نوع الحركة':typeMap[obj['نوع الحركة']]||'حركة موظف','العربية/البند':obj['الموظف'],'المبلغ':amt,'داخل':inn,'خارج':out,'الرصيد':oldBal+inn-out,'ملاحظات':obj['البيان']||''}); }
  if(ctx.type==='partner' && isNew){ const amount=Number(obj['إجمالي المبلغ المسجل'])||0; if(amount>0){ const cash=A('حركة الخزنة'),bal=cashBalance(); cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'إضافة شريك','العربية/البند':obj['الشريك'],'المبلغ':amount,'داخل':amount,'خارج':0,'الرصيد':bal+amount,'ملاحظات':'إضافة رأس مال شريك تلقائياً'}); } }
  // عند إضافة عربية جديدة: شراء + عمولة شراء يخرج من الخزنة تلقائياً
@@ -395,6 +431,7 @@ function saveModal(){
      cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'شراء عربية','العربية/البند':obj['العربية'],'المبلغ':amount,'داخل':0,'خارج':amount,'الرصيد':oldBal-amount,'ملاحظات':'خصم تلقائي عند تسجيل العربية'});
    }
  }
+ if(ctx.type==='car'){ rebuildCarContributions(); }
  save();closeModal();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ';
 }
 function edit(s,i){let map={'العربيات':'car','طلبات العملاء':'request','الشركاء':'partner','مساهمات العربيات':'contrib','حركة الشركاء':'move','مبالغ تسترد':'refund','الموظفين':'employee','حركة الموظفين':'employee_tx'};modal(map[s],A(s)[i],i,s)}
@@ -426,7 +463,7 @@ function del(s,i){
     A('حركة الشركاء').splice(0,A('حركة الشركاء').length,...A('حركة الشركاء').filter(x=>String(x['البيان']||'')!=='ربح من '+carName));
     const cash=A('حركة الخزنة');
     for(let j=cash.length-1;j>=0;j--){const x=cash[j];if(String(x['العربية/البند']||'')===carName&&(x['نوع الحركة']==='شراء عربية'||x['نوع الحركة']==='بيع عربية'))cash.splice(j,1);}
-    A('مساهمات العربيات').splice(0,A('مساهمات العربيات').length,...A('مساهمات العربيات').filter(x=>String(x['العربية']||'')!==carName));
+    const carId=String(row.id||''); A('مساهمات العربيات').splice(0,A('مساهمات العربيات').length,...A('مساهمات العربيات').filter(x=>String(x['car_id']||'')!==carId));
   }
   A(s).splice(i,1);
   let bal=0; for(const x of A('حركة الخزنة')){bal+=(Number(x['داخل'])||0)-(Number(x['خارج'])||0);x['الرصيد']=bal;}
@@ -444,7 +481,7 @@ function distributeSaleProfit(c,p){
 function saveSale(){
  let i=Number(sc.value),c=A('العربيات')[i],sell=Number(sp.value)||0,com=Number(scom.value)||0;
  if(!c||!sell)return alert('اختار عربية واكتب سعر البيع');
- c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم العميل المشتري']=sb.value;c['رقم تليفون العميل']=sphone.value;
+ c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);
  let p=sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com;c['صافي الربح الحقيقي']=p;c['ثلث المعرض']=p/3;c['ثلثان للشركاء']=p*2/3; distributeSaleProfit(c,p); c['ملاحظات']=snotes.value;
  const cash=A('حركة الخزنة'),oldBal=cashBalance();
  cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'إيداع قيمة البيع وخصم عمولة البيع تلقائياً'});
