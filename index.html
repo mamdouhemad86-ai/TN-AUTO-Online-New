@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TN Auto Online</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      color: #222;
+    }
+    header {
+      background: #111827;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    main {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 25px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.08);
+      margin-bottom: 20px;
+    }
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      background: #eee;
+      margin-top: 15px;
+    }
+    button {
+      padding: 12px 20px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #111827;
+      color: white;
+      font-size: 16px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>TN Auto</h1>
+  <div>نظام إدارة المعرض — Online</div>
+</header>
+
+<main>
+
+  <div class="card">
+    <h2>حالة النظام</h2>
+    <div id="status" class="status">جاري الاتصال بالسحابة...</div>
+  </div>
+
+  <div class="card">
+    <h2>البيانات</h2>
+    <p>السيارات: <strong id="carsCount">0</strong></p>
+    <p>الشركاء: <strong id="partnersCount">0</strong></p>
+  </div>
+
+  <div class="card">
+    <button onclick="testConnection()">اختبار الاتصال</button>
+  </div>
+
+</main>
+
+<script>
+
+const SUPABASE_URL = "https://swwiuunjpgdrsjwlupo.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_THtY-2aMTfpN9HcODht2OA_c585IK2U";
+
+const sb = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+
+async function testConnection() {
+
+  const status = document.getElementById("status");
+
+  status.textContent = "جاري الاتصال...";
+
+  try {
+
+    const { data: cars, error: carsError } =
+      await sb.from("cars").select("*");
+
+    if (carsError) throw carsError;
+
+    const { data: partners, error: partnersError } =
+      await sb.from("partners").select("*");
+
+    if (partnersError) throw partnersError;
+
+    document.getElementById("carsCount").textContent =
+      cars.length;
+
+    document.getElementById("partnersCount").textContent =
+      partners.length;
+
+    status.textContent =
+      "متصل أونلاين بالسحابة ✅";
+
+  } catch (error) {
+
+    console.error(error);
+
+    status.textContent =
+      "خطأ في الاتصال بالسحابة ❌";
+
+  }
+}
+
+testConnection();
+
+</script>
+
+</body>
+</html>
