@@ -22,24 +22,31 @@ async function cloudReplace(table, rows){
     if(e) throw e;
   }
 }
-async function syncFromCloud(){
-  if(!onlineMode){
-    alert('النظام حالياً يعمل محلياً. ضع Publishable Key الخاص بمشروع TN Auto في أعلى الملف لتفعيل الأونلاين.');
-    return;
-  }
+function applyCloudSnapshot(s){
+  if(!s) return;
+  const hasCloud = Object.values(s).some(v=>Array.isArray(v)&&v.length);
+  if(!hasCloud) return false;
+  if(s.cars.length) S['العربيات']=s.cars.map(r=>({id:r.id,'العربية':r.name||'', 'الموديل':r.model||'', 'السنة':r.year||'', 'سعر الشراء':Number(r.purchase_price)||0, 'عمولة الشراء':Number(r.purchase_commission)||0, 'سعر البيع':r.sale_price==null?'':Number(r.sale_price), 'عمولة البيع':Number(r.sale_commission)||0, 'حالة البيع':r.status==='sold'?'مباع':'متاح', 'المورد':r.supplier||'', 'هاتف المورد':r.supplier_phone||'', 'اسم المشتري':r.customer_name||'', 'هاتف المشتري':r.customer_phone||'', 'ملاحظات':r.notes||'', 'تاريخ الشراء':r.purchased_at||'', 'تاريخ البيع':r.sold_at||''}));
+  if(s.partners.length) S['الشركاء']=s.partners.map(r=>({id:r.id,'الشريك':r.name||'', 'إجمالي المبلغ المسجل':Number(r.capital)||0}));
+  if(s.contrib.length) S['مساهمات العربيات']=s.contrib.map(r=>({id:r.id,'car_id':r.car_id,'الشريك':r.partner_name||'', 'المبلغ':Number(r.amount)||0,'partner_id':r.partner_id||null}));
+  if(s.cash.length) S['حركة الخزنة']=s.cash.map(r=>({id:r.id,'التاريخ':r.transaction_date||'', 'نوع الحركة':r.type==='income'?'دخل':'مصروف','العربية/البند':r.description||'', 'المبلغ':Number(r.amount)||0,'داخل':r.type==='income'?Number(r.amount)||0:0,'خارج':r.type==='expense'?Number(r.amount)||0:0,'ملاحظات':r.description||''}));
+  if(s.requests.length) S['طلبات العملاء']=s.requests.map(r=>({id:r.id,'اسم العميل':r.customer_id||'', 'السيارة المطلوبة':r.desired_make||'', 'الموديل':r.desired_model||'', 'السنة من':r.desired_year_from||'', 'السنة إلى':r.desired_year_to||'', 'الميزانية من':r.budget_min||0,'الميزانية إلى':r.budget_max||0,'اللون':r.color||'', 'ملاحظات':r.notes||'', 'الحالة':r.status||''}));
+  if(s.employees.length) S['الموظفين']=s.employees.map(r=>({id:r.id,'الموظف':r.name||'', 'الوظيفة':r.job_title||'', 'رقم الهاتف':r.phone||'', 'الراتب الشهري':Number(r.monthly_salary)||0,'تاريخ التعيين':r.hire_date||'', 'الحالة':r.status==='inactive'?'غير نشط':'نشط','ملاحظات':r.notes||''}));
+  if(s.employee_transactions.length) { const names=new Map(s.employees.map(e=>[e.id,e.name])); S['حركة الموظفين']=s.employee_transactions.map(r=>({id:r.id,'الموظف':names.get(r.employee_id)||'', 'نوع الحركة':({'salary':'راتب','advance':'سلفة','bonus':'مكافأة','deduction':'خصم','expense':'مصروف'})[r.type]||r.type,'المبلغ':Number(r.amount)||0,'التاريخ':r.transaction_date||'', 'البيان':r.description||''})); }
+  localStorage.setItem(KEY,JSON.stringify(S));
+  return true;
+}
+async function syncFromCloud(showAlert=true){
+  if(!onlineMode){ if(showAlert) alert('النظام يعمل محلياً حالياً.'); return false; }
   try{
-    const [cars,partners,contrib,cash,requests,employees,employee_transactions]=await Promise.all([ 
-      cloudSelect('cars'),cloudSelect('partners'),cloudSelect('car_contributions'),
-      cloudSelect('cash_transactions'),cloudSelect('vehicle_requests'),cloudSelect('employees'),cloudSelect('employee_transactions')
-    ]);
-    window.__cloudSnapshot={cars,partners,contrib,cash,requests,employees,employee_transactions};
-    if(typeof sysStatus!=='undefined') sysStatus.textContent='تمت المزامنة';
-    alert('تم الاتصال بـ Supabase وقراءة البيانات بنجاح.');
-  }catch(e){
-    console.error(e);
-    if(typeof sysStatus!=='undefined') sysStatus.textContent='خطأ اتصال';
-    alert('حصل خطأ أثناء المزامنة: '+(e.message||e));
-  }
+    const [cars,partners,contrib,cash,requests,employees,employee_transactions]=await Promise.all([cloudSelect('cars'),cloudSelect('partners'),cloudSelect('car_contributions'),cloudSelect('cash_transactions'),cloudSelect('vehicle_requests'),cloudSelect('employees'),cloudSelect('employee_transactions')]);
+    const snapshot={cars,partners,contrib,cash,requests,employees,employee_transactions};
+    window.__cloudSnapshot=snapshot;
+    const loaded=applyCloudSnapshot(snapshot);
+    if(typeof sysStatus!=='undefined') sysStatus.textContent=loaded?'تم تحميل البيانات وحفظها':'متصل أونلاين';
+    if(showAlert) alert(loaded?'تم تحميل البيانات المحفوظة من Supabase بنجاح.':'اتصل النظام بقاعدة البيانات ولم يجد بيانات بعد.');
+    return loaded;
+  }catch(e){ console.error(e); if(typeof sysStatus!=='undefined') sysStatus.textContent='خطأ اتصال'; if(showAlert) alert('حصل خطأ أثناء تحميل البيانات: '+(e.message||e)); return false; }
 }
 </script>
 
@@ -266,7 +273,7 @@ function initOnline(){
 <div id="cashBox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💵 حركة خزنة</h2><button class="btn" onclick="closeCash()">إغلاق</button></div><div class="form"><div class="field"><label>التاريخ</label><input id="cd" type="date"></div><div class="field"><label>نوع الحركة</label><input id="ct"></div><div class="field"><label>العربية/البند</label><input id="ci"></div><div class="field"><label>المبلغ</label><input id="ca" type="number"></div><div class="field"><label>داخل</label><input id="cin" type="number" value="0"></div><div class="field"><label>خارج</label><input id="cout" type="number" value="0"></div><div class="field span3"><label>ملاحظات</label><textarea id="cn"></textarea></div></div><br><button class="btn primary" onclick="saveCash()">حفظ الحركة</button></div></div>
 
 <script>
-const INIT={"لوحة التحكم":[],"ملخص الخزنة":[],"الشركاء":[],"العربيات":[],"طلبات العملاء":[],"مبالغ تسترد":[],"مساهمات العربيات":[],"حركة الخزنة":[],"حركة الشركاء":[],"أرباح الشركاء":[],"ربح المعرض":[],"الموظفين":[],"حركة الموظفين":[]}, KEY='TN_AUTO_BLANK_V2'; localStorage.removeItem(KEY); let S=JSON.parse(localStorage.getItem(KEY)||'null')||INIT;
+const INIT={"لوحة التحكم":[],"ملخص الخزنة":[],"الشركاء":[],"العربيات":[],"طلبات العملاء":[],"مبالغ تسترد":[],"مساهمات العربيات":[],"حركة الخزنة":[],"حركة الشركاء":[],"أرباح الشركاء":[],"ربح المعرض":[],"الموظفين":[],"حركة الموظفين":[]}, KEY='TN_AUTO_BLANK_V2'; let S=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(INIT);
 function migrate(){
   const cash=A('حركة الخزنة');
   // Remove legacy placeholder rows with no real transaction data.
@@ -496,5 +503,12 @@ window.addEventListener('resize', function(){
 
 </body></html>
 <script>
-window.addEventListener('DOMContentLoaded',()=>{ initOnline(); if(onlineMode){ syncFromCloud().then(()=>syncLocalToCloud()).catch(console.error); } });
+window.addEventListener('DOMContentLoaded',async()=>{
+  initOnline();
+  if(onlineMode){
+    const loaded=await syncFromCloud(false);
+    if(!loaded && Object.values(S).some(v=>Array.isArray(v)&&v.length)) await syncLocalToCloud();
+  }
+  renderAll();
+});
 </script>
