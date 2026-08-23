@@ -64,6 +64,7 @@ function applyCloudSnapshot(s){
     S['حركة الخزنة']=mapped;
   }
   if(Array.isArray(s.refunds)) S['مبالغ تسترد']=s.refunds.map(r=>({id:r.id,'البند':r.item||'', 'المبلغ':Number(r.amount)||0,'الفئة':r.category||'', 'طريقة الاسترداد':r.recovery_method||'', 'تم استرداده':Number(r.recovered)||0,'المتبقي':Number(r.remaining)||Math.max(0,(Number(r.amount)||0)-(Number(r.recovered)||0)),'ملاحظات':r.notes||''}));
+  if(Array.isArray(s.partner_transactions)) { const names=new Map((s.partners||[]).map(p=>[p.id,p.name])); S['حركة الشركاء']=s.partner_transactions.map(r=>({id:r.id,'الشريك':names.get(r.partner_id)||'', 'التاريخ':r.transaction_date||'', 'نوع الحركة':({'profit':'ربح','deposit':'إضافة','withdrawal':'سحب','other':'أخرى'})[r.type]||r.type||'أخرى','البيان':r.description||'', 'المبلغ':Number(r.amount)||0,'ربح من العربيات':r.type==='profit'?Number(r.amount)||0:0,'الإضافة الكلية':r.type==='deposit'?Number(r.amount)||0:0,'السحب الكلي':r.type==='withdrawal'?Number(r.amount)||0:0,'الرصيد':0,'car_id':r.car_id||null})); }
   if(Array.isArray(s.requests)) S['طلبات العملاء']=s.requests.map(r=>({id:r.id,'اسم العميل':r.customer_id||'', 'السيارة المطلوبة':r.desired_make||'', 'الموديل':r.desired_model||'', 'السنة من':r.desired_year_from||'', 'السنة إلى':r.desired_year_to||'', 'الميزانية من':r.budget_min||0,'الميزانية إلى':r.budget_max||0,'اللون':r.color||'', 'ملاحظات':r.notes||'', 'الحالة':r.status||''}));
   if(Array.isArray(s.employees)) S['الموظفين']=s.employees.map(r=>({id:r.id,'الموظف':r.name||'', 'الوظيفة':r.job_title||'', 'رقم الهاتف':r.phone||'', 'الراتب الشهري':Number(r.monthly_salary)||0,'تاريخ التعيين':r.hire_date||'', 'الحالة':r.status==='inactive'?'غير نشط':'نشط','ملاحظات':r.notes||''}));
   if(Array.isArray(s.employee_transactions)) { const names=new Map(s.employees.map(e=>[e.id,e.name])); S['حركة الموظفين']=s.employee_transactions.map(r=>({id:r.id,'الموظف':names.get(r.employee_id)||'', 'نوع الحركة':({'salary':'راتب','advance':'سلفة','bonus':'مكافأة','deduction':'خصم','expense':'مصروف'})[r.type]||r.type,'المبلغ':Number(r.amount)||0,'التاريخ':r.transaction_date||'', 'البيان':r.description||''})); }
@@ -73,8 +74,8 @@ function applyCloudSnapshot(s){
 async function syncFromCloud(showAlert=true){
   if(!onlineMode){ if(showAlert) alert('النظام يعمل محلياً حالياً.'); return false; }
   try{
-    const [cars,partners,contrib,cash,requests,employees,employee_transactions,refunds,dashboard_settings]=await Promise.all([cloudSelect('cars'),cloudSelect('partners'),cloudSelect('car_contributions'),cloudSelect('cash_transactions'),cloudSelect('vehicle_requests'),cloudSelect('employees'),cloudSelect('employee_transactions'),cloudSelect('refunds'),cloudSelect('dashboard_settings')]);
-    const snapshot={cars,partners,contrib,cash,requests,employees,employee_transactions,refunds,dashboard_settings};
+    const [cars,partners,contrib,cash,requests,employees,employee_transactions,refunds,partner_transactions,dashboard_settings]=await Promise.all([cloudSelect('cars'),cloudSelect('partners'),cloudSelect('car_contributions'),cloudSelect('cash_transactions'),cloudSelect('vehicle_requests'),cloudSelect('employees'),cloudSelect('employee_transactions'),cloudSelect('refunds'),cloudSelect('partner_transactions'),cloudSelect('dashboard_settings')]);
+    const snapshot={cars,partners,contrib,cash,requests,employees,employee_transactions,refunds,partner_transactions,dashboard_settings};
     if(Array.isArray(dashboard_settings) && dashboard_settings.length){ S.__dashboardRecoverableAmount=Number(dashboard_settings[0].recoverable_amount)||0; }
     window.__cloudSnapshot=snapshot;
     const loaded=applyCloudSnapshot(snapshot);
@@ -104,6 +105,7 @@ function cleanRowsFor(table,rows){
     'vehicle_requests':['id','customer_id','desired_make','desired_model','desired_year_from','desired_year_to','budget_min','budget_max','color','notes','status'],
     'employees':['id','name','job_title','phone','monthly_salary','hire_date','status','notes'],
     'employee_transactions':['id','employee_id','type','amount','transaction_date','description'],
+    'partner_transactions':['id','partner_id','type','amount','car_id','description','transaction_date'],
     'refunds':['id','item','amount','category','recovery_method','recovered','remaining','notes']
   };
   const allowed=specs[table]||[];
@@ -167,6 +169,8 @@ async function syncLocalToCloud(){
     car_id:Number(r['car_id'])||null,
     transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10)
   }));
+  const partnerMap=new Map(partners.map(p=>[p.name,p.id]));
+  const partnerTx=A('حركة الشركاء').map((r,i)=>({id:Number(r.id)||i+1,partner_id:partnerMap.get(String(r['الشريك']))||null,type:({'ربح':'profit','إضافة':'deposit','سحب':'withdrawal'})[r['نوع الحركة']]||'other',amount:Number(r['المبلغ'])||0,car_id:Number(r['car_id'])||null,description:r['البيان']||null,transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10)})).filter(x=>x.partner_id&&x.amount>0);
   const employees=A('الموظفين').map((r,i)=>({id:Number(r.id)||i+1,name:String(r['الموظف']||''),job_title:r['الوظيفة']||null,phone:r['رقم الهاتف']||null,monthly_salary:Number(r['الراتب الشهري'])||0,hire_date:r['تاريخ التعيين']||null,status:r['الحالة']==='غير نشط'?'inactive':'active',notes:r['ملاحظات']||null}));
   const employeeMap=new Map(employees.map(e=>[e.name,e.id]));
   const employeeTx=A('حركة الموظفين').map((r,i)=>({id:Number(r.id)||i+1,employee_id:employeeMap.get(String(r['الموظف']))||null,type:({'راتب':'salary','سلفة':'advance','مكافأة':'bonus','خصم':'deduction','مصروف':'expense'})[r['نوع الحركة']]||'expense',amount:Number(r['المبلغ'])||0,transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10),description:r['البيان']||null})).filter(x=>x.employee_id&&x.amount>0);
@@ -179,6 +183,7 @@ async function syncLocalToCloud(){
     cloudReplace('vehicle_requests',A('طلبات العملاء').map((r,i)=>({id:Number(r.id)||i+1,customer_id:r['اسم العميل']||null,desired_make:r['السيارة المطلوبة']||null,desired_model:r['الموديل']||null,desired_year_from:Number(r['السنة من'])||null,desired_year_to:Number(r['السنة إلى'])||null,budget_min:Number(r['الميزانية من'])||0,budget_max:Number(r['الميزانية إلى']||r['الميزانية'])||0,color:r['اللون']||null,notes:r['ملاحظات']||null,status:r['الحالة']||'active'}))),
     cloudReplace('employees',employees),
     cloudReplace('employee_transactions',employeeTx),
+    cloudReplace('partner_transactions',partnerTx),
     cloudReplace('refunds',A('مبالغ تسترد').map((r,i)=>({id:Number(r.id)||i+1,item:r['البند']||r['اسم البند']||null,amount:Number(r['المبلغ'])||0,category:r['الفئة']||r['التصنيف']||null,recovery_method:r['طريقة الاسترداد']||null,recovered:Number(r['تم استرداده'])||0,remaining:Number(r['المتبقي'])||Math.max(0,(Number(r['المبلغ'])||0)-(Number(r['تم استرداده'])||0)),notes:r['ملاحظات']||null})))
   ]);
 
@@ -301,7 +306,7 @@ function initOnline(){
 <section id="moves" class="page hidden"><div class="panel"><h2>حركة الشركاء</h2><div class="toolbar"><button class="btn primary" onclick="withdrawModal()">💸 سحب شريك</button><button class="btn" onclick="modal('move')">➕ حركة أخرى</button></div><div class="tablewrap"><table class="table"><thead id="mh"></thead><tbody id="mb"></tbody></table></div></div></section>
 <section id="refunds" class="page hidden"><div class="panel"><h2>مبالغ تسترد</h2><div class="toolbar"><button class="btn primary" onclick="modal('refund')">➕ إضافة</button></div><div class="tablewrap"><table class="table"><thead id="rh"></thead><tbody id="rb"></tbody></table></div></div></section>
 <section id="profits" class="page hidden"><div class="grid"><div class="panel"><h2>أرباح الشركاء</h2><div class="tablewrap"><table class="table"><thead id="prh"></thead><tbody id="prb"></tbody></table></div></div><div class="panel"><h2>ربح المعرض</h2><div class="tablewrap"><table class="table"><thead id="showh"></thead><tbody id="showb"></tbody></table></div></div></div></section>
-<section id="employees" class="page hidden"><div class="panel"><h2>الموظفين</h2><div class="toolbar"><button class="btn primary" onclick="modal('employee')">➕ موظف جديد</button><button class="btn" onclick="modal('employee_tx')">💰 حركة موظف</button></div><div class="tablewrap"><table class="table"><thead id="eh"></thead><tbody id="eb"></tbody></table></div></div><div class="panel" style="margin-top:14px"><h3>حركة الموظفين</h3><div class="tablewrap"><table class="table"><thead id="eth"></thead><tbody id="etb"></tbody></table></div></div></section><section id="reports" class="page hidden"><div class="panel"><h2>التقارير</h2><div class="toolbar"><button class="btn" onclick="renderReport('sales')">المبيعات</button><button class="btn" onclick="renderReport('stock')">المخزون</button><button class="btn" onclick="renderReport('customers')">العملاء</button><button class="btn" onclick="renderReport('partners')">الشركاء</button><button class="btn" onclick="renderReport('cash')">الخزنة</button><button class="btn" onclick="renderReport('employees')">الموظفين</button><button class="btn" onclick="renderReport('employee_tx')">حركة الموظفين</button></div><div id="reportOutput"><div class="empty">اختار نوع التقرير</div></div></div></section>
+<section id="employees" class="page hidden"><div class="panel"><h2>الموظفين</h2><div class="toolbar"><button class="btn primary" onclick="modal('employee')">➕ موظف جديد</button><button class="btn" onclick="modal('employee_tx')">💰 حركة موظف</button></div><div class="tablewrap"><table class="table"><thead id="eh"></thead><tbody id="eb"></tbody></table></div></div><div class="panel" style="margin-top:14px"><h3>حركة الموظفين</h3><div class="tablewrap"><table class="table"><thead id="eth"></thead><tbody id="etb"></tbody></table></div></div></section><section id="reports" class="page hidden"><div class="panel"><h2>التقارير</h2><div class="toolbar"><button class="btn" onclick="renderReport('sales')">المبيعات</button><button class="btn" onclick="renderReport('stock')">المخزون</button><button class="btn" onclick="renderReport('customers')">العملاء</button><button class="btn" onclick="renderReport('partners')">الشركاء</button><button class="btn primary" onclick="renderPartnerDetailReport()">كشف شريك تفصيلي</button><button class="btn" onclick="renderReport('cash')">الخزنة</button><button class="btn" onclick="renderReport('employees')">الموظفين</button><button class="btn" onclick="renderReport('employee_tx')">حركة الموظفين</button></div><div id="reportOutput"><div class="empty">اختار نوع التقرير</div></div></div></section>
 <section id="original" class="page hidden"><div class="panel"><h2>البيانات الأصلية من ملف Excel</h2><div id="orig"></div></div></section>
 <div class="footer">الكاش الحقيقي = رصيد الخزنة الدفتري − العجز المتبقي في «مبالغ تسترد». البيانات الجديدة محفوظة محلياً على نفس الجهاز. عند نشر النظام على GitHub Pages، نحتاج قاعدة بيانات أونلاين إذا أردت استخدامها من أكثر من جهاز.</div></main>
 
@@ -341,18 +346,56 @@ function bookCashBalance(){const partners=A('الشركاء').reduce((s,x)=>s+(N
 function renderDash(){let cars=A('العربيات'),rq=activeReq(),mat=rq.filter(x=>match(x).length),listed=cars.filter(x=>!sold(x)),stock=listed.reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0),cap=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0),ref=recoverableTotal(),cash=bookCashBalance(),realCash=cash-ref;kc.textContent=cars.length;klisted.textContent=listed.length;ks.textContent=money(stock);kcash.textContent=money(cash);if(typeof krealcash!=='undefined')krealcash.textContent=money(realCash);kr.textContent=rq.length;km.textContent=mat.length;kcap.textContent=money(cap);kref.textContent=money(ref);alerts.innerHTML=(mat.length?mat.map(r=>`<div class="alert ok">🔔 <b>${esc(r['اسم العميل'])}</b> طالب ${esc(r['السيارة المطلوبة'])} ${esc(r['الموديل'])} — متاح ${match(r).length}.</div>`).join(''):'<div class="alert">لا توجد مطابقة حالياً.</div>');dashReq.innerHTML=rq.map(r=>`<tr><td>${esc(r['اسم العميل'])}</td><td>${esc(r['السيارة المطلوبة'])}</td><td>${esc(r['الموديل'])}</td><td>${money(r['الميزانية'])}</td><td>${match(r).length?'<span class="tag ok">🔔 مطابقة</span>':'<span class="tag warn">انتظار</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد طلبات</td></tr>'}
 function renderCars(){let q=(cq.value||'');table('العربيات','carh','carb',q)}
 function renderRequests(){let q=(rq.value||''),hs=h('طلبات العملاء'),rs=A('طلبات العملاء').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())));reqh.innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>مطابقة</th><th>إجراء</th></tr>';reqb.innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td>${match(r).length?'<span class="tag ok">🔔 '+match(r).length+'</span>':'<span class="tag warn">لا توجد</span>'}</td><td><button class="btn" onclick="edit('طلبات العملاء',${i})">تعديل</button> <button class="btn danger" onclick="del('طلبات العملاء',${i})">حذف</button></td></tr>`).join('')||'<tr><td colspan="15" class="empty">لا توجد طلبات</td></tr>'}
-function renderProfits(){let hs=['الشريك','رأس المال المسجل','إجمالي الأرباح','إجمالي الإضافات','إجمالي السحوبات','الرصيد الحالي'];prh.innerHTML='<tr>'+hs.map(x=>`<th>${x}</th>`).join('')+'</tr>';prb.innerHTML=A('الشركاء').map(p=>{let mv=A('حركة الشركاء').filter(x=>x['الشريك']===p['الشريك']);let profit=mv.reduce((s,x)=>s+(Number(x['ربح من العربيات'])||0),0),add=mv.reduce((s,x)=>s+(Number(x['الإضافة الكلية'])||0),0),wd=mv.reduce((s,x)=>s+(Number(x['السحب الكلي'])||0),0),bal=(Number(p['إجمالي المبلغ المسجل'])||0)+profit+add-wd;return `<tr><td>${esc(p['الشريك'])}</td><td>${money(p['إجمالي المبلغ المسجل'])}</td><td>${money(profit)}</td><td>${money(add)}</td><td>${money(wd)}</td><td><b>${money(bal)}</b></td></tr>`}).join('');let c=A('العربيات').filter(x=>Number(x['سعر البيع'])>0),sh=['العربية','سعر الشراء','عمولة الشراء','سعر البيع','عمولة البيع','صافي الربح الحقيقي','ثلث المعرض'];showh.innerHTML='<tr>'+sh.map(x=>`<th>${x}</th>`).join('')+'</tr>';showb.innerHTML=c.map(x=>'<tr>'+sh.map(k=>`<td>${k==='العربية'?esc(x[k]):money(x[k])}</td>`).join('')+'</tr>').join('')||'<tr><td colspan="7" class="empty">لا توجد مبيعات</td></tr>'}
-function renderOriginal(){orig.innerHTML=Object.keys(S).map(s=>`<details><summary><b>${esc(s)}</b> — ${A(s).length} سجل</summary><div class="tablewrap" style="margin:8px 0"><table class="table"><thead><tr>${h(s).map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${A(s).slice(0,40).map(r=>'<tr>'+h(s).map(x=>`<td>${esc(r[x])}</td>`).join('')+'</tr>').join('')}</tbody></table></div></details>`).join('')}
-function renderReport(type){
- let rs=[],hs=[];
- if(type==='sales'){hs=['العربية','الموديل','سعر الشراء','سعر البيع','عمولة البيع','صافي الربح الحقيقي'];rs=A('العربيات').filter(x=>Number(x['سعر البيع'])>0).map(x=>[x['العربية'],x['الموديل'],x['سعر الشراء'],x['سعر البيع'],x['عمولة البيع'],x['صافي الربح الحقيقي']]);}
- else if(type==='stock'){hs=['العربية','الموديل','سعر الشراء','حالة البيع','المورد'];rs=A('العربيات').filter(x=>!sold(x)).map(x=>[x['العربية'],x['الموديل'],x['سعر الشراء'],x['حالة البيع'],x['مصدر العربية / المورد']]);}
- else if(type==='customers'){hs=['التاريخ','العميل','الهاتف','العربية','الموديل','الميزانية','الحالة','مطابقة'];rs=A('طلبات العملاء').map(x=>[x['التاريخ'],x['اسم العميل'],x['رقم التليفون'],x['السيارة المطلوبة'],x['الموديل'],x['الميزانية'],x['الحالة'],match(x).length]);}
- else if(type==='partners'){hs=['الشريك','رأس المال','موزع','غير موزع','أرباح','إضافات','سحوبات','الرصيد الحالي'];rs=A('الشركاء').map(p=>{let mv=A('حركة الشركاء').filter(x=>x['الشريك']===p['الشريك']);let profit=mv.reduce((s,x)=>s+(Number(x['ربح من العربيات'])||0),0),add=mv.reduce((s,x)=>s+(Number(x['الإضافة الكلية'])||0),0),wd=mv.reduce((s,x)=>s+(Number(x['السحب الكلي'])||0),0),bal=(Number(p['إجمالي المبلغ المسجل'])||0)+profit+add-wd;return [p['الشريك'],p['إجمالي المبلغ المسجل'],p['الموزع على العربيات'],p['غير موزع'],profit,add,wd,bal];});}
- else if(type==='cash'){hs=['التاريخ','نوع الحركة','العربية/البند','داخل','خارج','الرصيد','ملاحظات'];rs=A('حركة الخزنة').map(x=>[x['التاريخ'],x['نوع الحركة'],x['العربية/البند'],x['داخل'],x['خارج'],x['الرصيد'],x['ملاحظات']]);}
- else if(type==='employees'){hs=['الموظف','الوظيفة','الراتب الشهري','إجمالي السلف','إجمالي المكافآت','إجمالي الخصومات','إجمالي المصروفات','الحالة'];rs=A('الموظفين').map(e=>{let tx=A('حركة الموظفين').filter(x=>String(x['الموظف'])===String(e['الموظف']));let sum=t=>tx.filter(x=>x['نوع الحركة']===t).reduce((s,x)=>s+(Number(x['المبلغ'])||0),0);return [e['الموظف'],e['الوظيفة'],e['الراتب الشهري'],sum('سلفة'),sum('مكافأة'),sum('خصم'),sum('مصروف'),e['الحالة']];});}
- else {hs=['التاريخ','الموظف','نوع الحركة','المبلغ','البيان'];rs=A('حركة الموظفين').map(x=>[x['التاريخ'],x['الموظف'],x['نوع الحركة'],x['المبلغ'],x['البيان']]);}
- reportOutput.innerHTML='<div class="tablewrap"><table class="table"><thead><tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'</tr></thead><tbody>'+ (rs.length?rs.map(r=>'<tr>'+r.map((v,i)=>`<td>${typeof v==='number'&&i>0?money(v):esc(v)}</td>`).join('')+'</tr>').join(''):'<tr><td colspan="'+hs.length+'" class="empty">لا توجد بيانات</td></tr>')+'</tbody></table></div>';
+function partnerStats(p){
+  const name=String(p['الشريك']||'');
+  const partnerId=Number(p.id)||null;
+  const cars=A('العربيات');
+  const currentCars=[];
+  let invested=0;
+  for(const c of cars){
+    if(sold(c)) continue;
+    const raw=String(c['مساهمات الشركاء']||'');
+    raw.split('|').map(x=>x.trim()).filter(Boolean).forEach(part=>{
+      const m=part.match(/^(.+?):\s*([\d.,]+)/); if(!m||m[1].trim()!==name)return;
+      const amount=Number(m[2].replace(/,/g,''))||0; if(amount<=0)return;
+      invested+=amount; currentCars.push({car:c,amount});
+    });
+  }
+  const mv=A('حركة الشركاء').filter(x=>String(x['الشريك']||'')===name);
+  const profit=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='ربح'?Number(x['المبلغ'])||0:Number(x['ربح من العربيات'])||0),0);
+  const deposits=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='إضافة'?Number(x['المبلغ'])||0:Number(x['الإضافة الكلية'])||0),0);
+  const withdrawals=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:Number(x['السحب الكلي'])||0),0);
+  const capital=Number(p['إجمالي المبلغ المسجل'])||0;
+  const undistributed=Math.max(0,capital-invested-withdrawals);
+  const finalBalance=capital+profit-withdrawals;
+  return {name,partnerId,capital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
+}
+function renderProfits(){
+  let hs=['الشريك','رأس المال الحالي','الموزع على العربيات حاليًا','نقدية رأس المال المتبقية','الأرباح','الإيداعات الإضافية','السحوبات','الرصيد النهائي'];
+  prh.innerHTML='<tr>'+hs.map(x=>`<th>${x}</th>`).join('')+'</tr>';
+  prb.innerHTML=A('الشركاء').map(p=>{const st=partnerStats(p);return `<tr><td>${esc(st.name)}</td><td>${money(st.capital)}</td><td>${money(st.invested)}</td><td>${money(st.undistributed)}</td><td>${money(st.profit)}</td><td>${money(st.deposits)}</td><td>${money(st.withdrawals)}</td><td><b>${money(st.finalBalance)}</b></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">لا توجد بيانات</td></tr>';
+  let c=A('العربيات').filter(x=>Number(x['سعر البيع'])>0),sh=['العربية','سعر الشراء','عمولة الشراء','سعر البيع','عمولة البيع','صافي الربح الحقيقي','ثلث المعرض'];showh.innerHTML='<tr>'+sh.map(x=>`<th>${x}</th>`).join('')+'</tr>';showb.innerHTML=c.map(x=>'<tr>'+sh.map(k=>`<td>${k==='العربية'?esc(x[k]):money(x[k])}</td>`).join('')+'</tr>').join('')||'<tr><td colspan="7" class="empty">لا توجد مبيعات</td></tr>';
+}
+function renderPartnerDetailReport(){
+  const out=document.getElementById('reportOutput'); if(!out)return;
+  const partners=A('الشركاء');
+  if(!partners.length){out.innerHTML='<div class="empty">لا يوجد شركاء</div>';return;}
+  const options=partners.map((p,i)=>`<option value="${i}">${esc(p['الشريك'])}</option>`).join('');
+  out.innerHTML=`<div class="panel" style="margin-top:0"><div class="toolbar"><label style="font-size:12px;color:var(--muted);padding-top:10px">اختار الشريك</label><select id="partnerDetailSelect" class="search" onchange="showPartnerDetail(this.value)">${options}</select></div><div id="partnerDetailBody"></div></div>`;
+  showPartnerDetail(0);
+}
+function showPartnerDetail(index){
+  const p=A('الشركاء')[Number(index)]; const body=document.getElementById('partnerDetailBody'); if(!p||!body)return;
+  const st=partnerStats(p);
+  const cards=[['رأس المال الحالي',st.capital],['الموزع على العربيات حاليًا',st.invested],['نقدية رأس المال المتبقية',st.undistributed],['الأرباح المستحقة',st.profit],['إجمالي السحوبات',st.withdrawals],['الرصيد النهائي',st.finalBalance]];
+  let html='<div class="cards" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">'+cards.map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="num">${money(x[1])}</div></div>`).join('')+'</div>';
+  html+='<div class="panel"><h3>فلوس الشريك الموجودة حاليًا في العربيات</h3><div class="tablewrap"><table class="table"><thead><tr><th>العربية</th><th>الموديل</th><th>مساهمة الشريك</th><th>نسبة المساهمة</th></tr></thead><tbody>';
+  html+=st.currentCars.map(x=>{const total=Number(x.car['سعر الشراء'])||0;const pct=total?x.amount/total*100:0;return `<tr><td>${esc(x.car['العربية'])}</td><td>${esc(x.car['الموديل']||'')}</td><td>${money(x.amount)}</td><td>${pct.toFixed(2)}%</td></tr>`}).join('')||'<tr><td colspan="4" class="empty">لا توجد مساهمات حالية في عربيات موجودة</td></tr>';
+  html+='</tbody></table></div></div>';
+  html+='<div class="panel" style="margin-top:14px"><h3>حركة الشريك</h3><div class="tablewrap"><table class="table"><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>';
+  html+=st.mv.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${esc(x['البيان']||'')}</td><td>${money(x['المبلغ'])}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">لا توجد حركة مسجلة</td></tr>';
+  html+='</tbody></table></div></div>';
+  body.innerHTML=html;
 }
 function renderEmployees(){
  let hs=['الموظف','الوظيفة','رقم الهاتف','الراتب الشهري','تاريخ التعيين','الحالة','ملاحظات'];
