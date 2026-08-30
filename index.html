@@ -614,3 +614,131 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderAll();
 });
 </script>
+<script>
+(function () {
+  const LOGIN_EMAIL = 'mamdouhemad86@gmail.com';
+
+  const style = document.createElement('style');
+  style.textContent = `
+    #tn-login-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: #f5f7fb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Tahoma, Arial, sans-serif;
+      direction: rtl;
+    }
+
+    #tn-login-box {
+      width: min(92%, 380px);
+      background: white;
+      padding: 28px;
+      border-radius: 16px;
+      box-shadow: 0 10px 35px rgba(0,0,0,.15);
+      text-align: center;
+    }
+
+    #tn-login-box h2 {
+      margin: 0 0 22px;
+    }
+
+    #tn-login-box input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 13px;
+      margin: 7px 0;
+      border: 1px solid #ddd;
+      border-radius: 9px;
+      font-size: 15px;
+    }
+
+    #tn-login-btn {
+      width: 100%;
+      margin-top: 12px;
+      padding: 13px;
+      border: 0;
+      border-radius: 9px;
+      background: #155eef;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #tn-login-error {
+      color: #d92d20;
+      margin-top: 12px;
+      display: none;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const screen = document.createElement('div');
+  screen.id = 'tn-login-screen';
+
+  screen.innerHTML = `
+    <div id="tn-login-box">
+      <h2>TN Auto System</h2>
+      <input id="tn-login-email" type="email"
+             value="${LOGIN_EMAIL}" readonly>
+      <input id="tn-login-password" type="password"
+             placeholder="كلمة المرور">
+      <button id="tn-login-btn">تسجيل الدخول</button>
+      <div id="tn-login-error">بيانات الدخول غير صحيحة</div>
+    </div>
+  `;
+
+  document.body.appendChild(screen);
+
+  async function checkLogin() {
+    try {
+      const { data } = await sb.auth.getSession();
+
+      if (data && data.session) {
+        screen.remove();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  document.getElementById('tn-login-btn').addEventListener('click', async function () {
+    const password = document.getElementById('tn-login-password').value;
+    const errorBox = document.getElementById('tn-login-error');
+
+    errorBox.style.display = 'none';
+
+    if (!password) {
+      errorBox.textContent = 'اكتب كلمة المرور';
+      errorBox.style.display = 'block';
+      return;
+    }
+
+    this.disabled = true;
+    this.textContent = 'جاري الدخول...';
+
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: LOGIN_EMAIL,
+        password: password
+      });
+
+      if (error || !data.session) {
+        throw error || new Error('Login failed');
+      }
+
+      screen.remove();
+
+    } catch (e) {
+      errorBox.textContent = 'كلمة المرور غير صحيحة';
+      errorBox.style.display = 'block';
+      this.disabled = false;
+      this.textContent = 'تسجيل الدخول';
+    }
+  });
+
+  checkLogin();
+})();
+</script>
