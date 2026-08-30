@@ -65,7 +65,7 @@ function applyCloudSnapshot(s){
   }
   if(Array.isArray(s.refunds)) S['مبالغ تسترد']=s.refunds.map(r=>({id:r.id,'البند':r.item||'', 'المبلغ':Number(r.amount)||0,'الفئة':r.category||'', 'طريقة الاسترداد':r.recovery_method||'', 'تم استرداده':Number(r.recovered)||0,'المتبقي':Number(r.remaining)||Math.max(0,(Number(r.amount)||0)-(Number(r.recovered)||0)),'ملاحظات':r.notes||''}));
   if(Array.isArray(s.partner_transactions)) { const names=new Map((s.partners||[]).map(p=>[p.id,p.name])); S['حركة الشركاء']=s.partner_transactions.map(r=>({id:r.id,'الشريك':names.get(r.partner_id)||'', 'التاريخ':r.transaction_date||'', 'نوع الحركة':({'profit':'ربح','deposit':'إضافة','withdrawal':'سحب','other':'أخرى'})[r.type]||r.type||'أخرى','البيان':r.description||'', 'المبلغ':Number(r.amount)||0,'ربح من العربيات':r.type==='profit'?Number(r.amount)||0:0,'الإضافة الكلية':r.type==='deposit'?Number(r.amount)||0:0,'السحب الكلي':r.type==='withdrawal'?Number(r.amount)||0:0,'الرصيد':0,'car_id':r.car_id||null})); }
-  if(Array.isArray(s.requests)) S['طلبات العملاء']=s.requests.map(r=>({id:r.id,'اسم العميل':r.customer_id||'', 'السيارة المطلوبة':r.desired_make||'', 'الموديل':r.desired_model||'', 'السنة من':r.desired_year_from||'', 'السنة إلى':r.desired_year_to||'', 'الميزانية من':r.budget_min||0,'الميزانية إلى':r.budget_max||0,'اللون':r.color||'', 'ملاحظات':r.notes||'', 'الحالة':r.status||''}));
+  if(Array.isArray(s.requests)) { const customerMap=new Map((s.customers||[]).map(c=>[Number(c.id),c])); S['طلبات العملاء']=s.requests.map(r=>{const c=customerMap.get(Number(r.customer_id)); const extraNotes=String(r.notes||''); return {id:r.id,'التاريخ':r.request_date||'', 'اسم العميل':c?.name||'', 'رقم التليفون':c?.phone||'', 'السيارة المطلوبة':r.desired_make||'', 'الموديل':r.desired_model||'', 'السنة من':r.desired_year_from||'', 'السنة إلى':r.desired_year_to||'', 'الميزانية من':r.budget_min||0,'الميزانية إلى':r.budget_max||0,'الميزانية':r.budget_max||r.budget_min||0,'كاش/تقسيط':r.payment_method||'', 'المقدم':r.down_payment||'', 'اللون':r.color||'', 'الحالة':r.status||'', 'مسؤول الطلب':r.responsible||'', 'ملاحظات':extraNotes}; }); }
   if(Array.isArray(s.employees)) S['الموظفين']=s.employees.map(r=>({id:r.id,'الموظف':r.name||'', 'الوظيفة':r.job_title||'', 'رقم الهاتف':r.phone||'', 'الراتب الشهري':Number(r.monthly_salary)||0,'تاريخ التعيين':r.hire_date||'', 'الحالة':r.status==='inactive'?'غير نشط':'نشط','ملاحظات':r.notes||''}));
   if(Array.isArray(s.employee_transactions)) { const names=new Map(s.employees.map(e=>[e.id,e.name])); S['حركة الموظفين']=s.employee_transactions.map(r=>({id:r.id,'الموظف':names.get(r.employee_id)||'', 'نوع الحركة':({'salary':'راتب','advance':'سلفة','bonus':'مكافأة','deduction':'خصم','expense':'مصروف'})[r.type]||r.type,'المبلغ':Number(r.amount)||0,'التاريخ':r.transaction_date||'', 'البيان':r.description||''})); }
   localStorage.setItem(KEY,JSON.stringify(S));
@@ -74,8 +74,8 @@ function applyCloudSnapshot(s){
 async function syncFromCloud(showAlert=true){
   if(!onlineMode){ if(showAlert) alert('النظام يعمل محلياً حالياً.'); return false; }
   try{
-    const [cars,partners,contrib,cash,requests,employees,employee_transactions,refunds,partner_transactions,dashboard_settings]=await Promise.all([cloudSelect('cars'),cloudSelect('partners'),cloudSelect('car_contributions'),cloudSelect('cash_transactions'),cloudSelect('vehicle_requests'),cloudSelect('employees'),cloudSelect('employee_transactions'),cloudSelect('refunds'),cloudSelect('partner_transactions'),cloudSelect('dashboard_settings')]);
-    const snapshot={cars,partners,contrib,cash,requests,employees,employee_transactions,refunds,partner_transactions,dashboard_settings};
+    const [cars,partners,contrib,cash,customers,requests,employees,employee_transactions,refunds,partner_transactions,dashboard_settings]=await Promise.all([cloudSelect('cars'),cloudSelect('partners'),cloudSelect('car_contributions'),cloudSelect('cash_transactions'),cloudSelect('customers'),cloudSelect('vehicle_requests'),cloudSelect('employees'),cloudSelect('employee_transactions'),cloudSelect('refunds'),cloudSelect('partner_transactions'),cloudSelect('dashboard_settings')]);
+    const snapshot={cars,partners,contrib,cash,customers,requests,employees,employee_transactions,refunds,partner_transactions,dashboard_settings};
     if(Array.isArray(dashboard_settings) && dashboard_settings.length){ S.__dashboardRecoverableAmount=Number(dashboard_settings[0].recoverable_amount)||0; }
     window.__cloudSnapshot=snapshot;
     const loaded=applyCloudSnapshot(snapshot);
@@ -102,7 +102,8 @@ function cleanRowsFor(table,rows){
     'partners':['id','name','capital'],
     'car_contributions':['id','car_id','partner_name','amount','partner_id'],
     'cash_transactions':['id','type','amount','description','partner_id','car_id','transaction_date'],
-    'vehicle_requests':['id','customer_id','desired_make','desired_model','desired_year_from','desired_year_to','budget_min','budget_max','color','notes','status'],
+    'customers':['id','name','phone','whatsapp','city','notes'],
+    'vehicle_requests':['id','customer_id','desired_make','desired_model','desired_year_from','desired_year_to','budget_min','budget_max','color','notes','status','request_date','payment_method','down_payment','responsible'],
     'employees':['id','name','job_title','phone','monthly_salary','hire_date','status','notes'],
     'employee_transactions':['id','employee_id','type','amount','transaction_date','description'],
     'partner_transactions':['id','partner_id','type','amount','car_id','description','transaction_date'],
@@ -124,12 +125,37 @@ async function upsertTable(table,rows){
   }
 }
 async function syncLocalToCloud(){
-  if(!onlineMode)return;
+  if(!onlineMode)return false;
+  if(!sb)throw new Error('Supabase client غير جاهز');
   if(typeof sysStatus!=='undefined')sysStatus.textContent='جاري الحفظ أونلاين...';
 
-  // The existing UI uses Arabic sheet-shaped objects, so only map the
-  // core tables here; the remaining UI stays local until its DB mapping
-  // is finalized.
+  const requestsLocal=A('طلبات العملاء');
+  // vehicle_requests.customer_id is a bigint, while the old UI stores the
+  // customer's name/phone. Reuse existing cloud customers when possible and
+  // create a stable numeric id for new customers.
+  const existingCustomers=await cloudSelect('customers');
+  const customerByKey=new Map();
+  (existingCustomers||[]).forEach(c=>{
+    const key=(String(c.name||'').trim().toLowerCase()+'|'+String(c.phone||'').trim());
+    if(key!=='|')customerByKey.set(key,Number(c.id));
+  });
+  let nextCustomerId=(existingCustomers||[]).reduce((m,c)=>Math.max(m,Number(c.id)||0),0)+1;
+  const customers=[];
+  const customerIdByKey=new Map();
+  for(const r of requestsLocal){
+    const name=String(r['اسم العميل']||'').trim();
+    const phone=String(r['رقم التليفون']||'').trim();
+    if(!name && !phone)continue;
+    const key=name.toLowerCase()+'|'+phone;
+    let id=customerByKey.get(key);
+    if(!id){ id=nextCustomerId++; customerByKey.set(key,id); }
+    customerIdByKey.set(key,id);
+    customers.push({id,name:name||'عميل',phone:phone||null,whatsapp:null,city:null,notes:null});
+  }
+  // Keep one row per customer id.
+  const customerMap=new Map(customers.map(c=>[c.id,c]));
+  const customersClean=[...customerMap.values()];
+
   const cars=A('العربيات').map((r,i)=>({
     id:Number(r.id)||i+1,
     name:String(r['العربية']||''),
@@ -137,7 +163,7 @@ async function syncLocalToCloud(){
     year:Number(r['السنة'])||null,
     purchase_price:Number(r['سعر الشراء'])||0,
     purchase_commission:Number(r['عمولة الشراء'])||0,
-    sale_price:Number(r['سعر البيع'])||null,
+    sale_price:r['سعر البيع']===''||r['سعر البيع']==null?null:Number(r['سعر البيع'])||0,
     sale_commission:Number(r['عمولة البيع'])||0,
     status:sold(r)?'sold':'available',
     supplier:r['المورد']||null,
@@ -174,20 +200,47 @@ async function syncLocalToCloud(){
   const employees=A('الموظفين').map((r,i)=>({id:Number(r.id)||i+1,name:String(r['الموظف']||''),job_title:r['الوظيفة']||null,phone:r['رقم الهاتف']||null,monthly_salary:Number(r['الراتب الشهري'])||0,hire_date:r['تاريخ التعيين']||null,status:r['الحالة']==='غير نشط'?'inactive':'active',notes:r['ملاحظات']||null}));
   const employeeMap=new Map(employees.map(e=>[e.name,e.id]));
   const employeeTx=A('حركة الموظفين').map((r,i)=>({id:Number(r.id)||i+1,employee_id:employeeMap.get(String(r['الموظف']))||null,type:({'راتب':'salary','سلفة':'advance','مكافأة':'bonus','خصم':'deduction','مصروف':'expense'})[r['نوع الحركة']]||'expense',amount:Number(r['المبلغ'])||0,transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10),description:r['البيان']||null})).filter(x=>x.employee_id&&x.amount>0);
+  const vehicleRequests=requestsLocal.map((r,i)=>{
+    const name=String(r['اسم العميل']||'').trim();
+    const phone=String(r['رقم التليفون']||'').trim();
+    const key=name.toLowerCase()+'|'+phone;
+    return {
+      id:Number(r.id)||i+1,
+      customer_id:customerIdByKey.get(key)||null,
+      desired_make:r['السيارة المطلوبة']||null,
+      desired_model:r['الموديل']||null,
+      desired_year_from:null,
+      desired_year_to:null,
+      budget_min:Number(r['الميزانية من']||r['الميزانية'])||0,
+      budget_max:Number(r['الميزانية إلى']||r['الميزانية'])||0,
+      color:r['اللون']||null,
+      notes:[r['ملاحظات'],r['كاش/تقسيط']?'طريقة الدفع: '+r['كاش/تقسيط']:null,r['مسؤول الطلب']?'مسؤول: '+r['مسؤول الطلب']:null].filter(Boolean).join(' | ')||null,
+      status:r['الحالة']||'open',
+      request_date:r['التاريخ']||null,
+      payment_method:r['كاش/تقسيط']||null,
+      down_payment:Number(r['المقدم'])||null,
+      responsible:r['مسؤول الطلب']||null
+    };
+  });
+  const refunds=A('مبالغ تسترد').map((r,i)=>({id:Number(r.id)||i+1,item:r['البند']||r['اسم البند']||'غير محدد',amount:Number(r['المبلغ'])||0,category:r['الفئة']||r['التصنيف']||null,recovery_method:r['طريقة الاسترداد']||null,recovered:Number(r['تم استرداده'])||0,remaining:Number(r['المتبقي'])||Math.max(0,(Number(r['المبلغ'])||0)-(Number(r['تم استرداده'])||0)),notes:r['ملاحظات']||null}));
 
   await Promise.all([
     cloudReplace('cars',cars),
     cloudReplace('partners',partners),
     cloudReplace('car_contributions',contrib),
     cloudReplace('cash_transactions',cash),
-    cloudReplace('vehicle_requests',A('طلبات العملاء').map((r,i)=>({id:Number(r.id)||i+1,customer_id:r['اسم العميل']||null,desired_make:r['السيارة المطلوبة']||null,desired_model:r['الموديل']||null,desired_year_from:Number(r['السنة من'])||null,desired_year_to:Number(r['السنة إلى'])||null,budget_min:Number(r['الميزانية من'])||0,budget_max:Number(r['الميزانية إلى']||r['الميزانية'])||0,color:r['اللون']||null,notes:r['ملاحظات']||null,status:r['الحالة']||'active'}))),
+    cloudReplace('customers',customersClean),
+    cloudReplace('vehicle_requests',vehicleRequests),
     cloudReplace('employees',employees),
     cloudReplace('employee_transactions',employeeTx),
     cloudReplace('partner_transactions',partnerTx),
-    cloudReplace('refunds',A('مبالغ تسترد').map((r,i)=>({id:Number(r.id)||i+1,item:r['البند']||r['اسم البند']||null,amount:Number(r['المبلغ'])||0,category:r['الفئة']||r['التصنيف']||null,recovery_method:r['طريقة الاسترداد']||null,recovered:Number(r['تم استرداده'])||0,remaining:Number(r['المتبقي'])||Math.max(0,(Number(r['المبلغ'])||0)-(Number(r['تم استرداده'])||0)),notes:r['ملاحظات']||null})))
+    cloudReplace('refunds',refunds),
+    // Keep dashboard settings in the cloud as a single row.
+    cloudReplace('dashboard_settings',[{id:1,recoverable_amount:recoverableTotal(),base_cash:0}])
   ]);
 
   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ أونلاين';
+  return true;
 }
 </script>
 
@@ -211,7 +264,8 @@ function initOnline(){
 <style id="mobile-fix-v12">
 /* TN Auto mobile layout */
 @media (max-width: 700px) {
-  body { overflow-x: hidden !important; }
+  /* iPhone: keep the desktop-style density/layout, but scale it down to fit */
+  body { overflow-x: hidden !important; font-size: 12px !important; }
   .nav {
     position: fixed !important;
     top: 0 !important;
@@ -254,27 +308,43 @@ function initOnline(){
     width: 100% !important;
     max-width: 100% !important;
     margin-right: 0 !important;
-    padding-left: 10px !important;
-    padding-right: 10px !important;
+    padding: 9px !important;
     box-sizing: border-box !important;
   }
+  .top { gap: 7px !important; margin-bottom: 10px !important; }
+  .top h1 { font-size: 18px !important; }
+  .top p { font-size: 10px !important; }
+  .actions { gap: 5px !important; }
+  .btn { padding: 7px 9px !important; font-size: 12px !important; }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 7px !important; }
+  .card, .panel { padding: 10px !important; border-radius: 10px !important; }
+  .num { font-size: 18px !important; margin-top: 4px !important; }
+  .label { font-size: 10px !important; }
+  .grid { grid-template-columns: 1.15fr .85fr !important; gap: 8px !important; margin-top: 8px !important; }
+  .toolbar { gap: 5px !important; margin-bottom: 8px !important; }
+  .search { min-width: 120px !important; padding: 7px !important; }
   .tablewrap {
     width: 100% !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
   }
   table { min-width: 720px; }
-  .cards, .grid, .form {
-    grid-template-columns: 1fr !important;
-  }
-  .field.span2, .field.span3 { grid-column: auto !important; }
+  .form { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .field.span3 { grid-column: 1 / -1 !important; }
+  .field.span2 { grid-column: span 1 !important; }
+  .field label { font-size: 10px !important; }
+  .field input, .field select, .field textarea { padding: 7px !important; }
   .modal, .modalbox, .dialog {
     width: calc(100vw - 20px) !important;
     max-width: calc(100vw - 20px) !important;
     max-height: 90vh !important;
     overflow-y: auto !important;
   }
-  input, select, textarea, button { font-size: 16px !important; }
+  input, select, textarea, button { font-size: 14px !important; }
+  .table { font-size: 11px !important; }
+  .table th, .table td { padding: 7px !important; }
+  .modal { padding: 10px !important; }
+  .modalbox { padding: 13px !important; border-radius: 12px !important; }
 }
 @media (min-width: 701px) {
   .mobile-menu-btn, .mobile-nav-overlay { display: none !important; }
@@ -608,8 +678,13 @@ window.addEventListener('resize', function(){
 window.addEventListener('DOMContentLoaded',async()=>{
   initOnline();
   if(onlineMode){
-    const loaded=await syncFromCloud(false);
-    if(!loaded && Object.values(S).some(v=>Array.isArray(v)&&v.length)) await syncLocalToCloud();
+    try{
+      const {data}=await sb.auth.getSession();
+      if(data?.session){
+        const loaded=await syncFromCloud(false);
+        if(!loaded && Object.values(S).some(v=>Array.isArray(v)&&v.length)) await syncLocalToCloud();
+      }
+    }catch(e){ console.error('Initial cloud sync failed:',e); if(typeof sysStatus!=='undefined')sysStatus.textContent='تعذر الاتصال بالسحابة'; }
   }
   renderAll();
 });
@@ -730,6 +805,15 @@ window.addEventListener('DOMContentLoaded',async()=>{
       }
 
       screen.remove();
+      try {
+        const loaded=await syncFromCloud(false);
+        if(!loaded && Object.values(S).some(v=>Array.isArray(v)&&v.length)) await syncLocalToCloud();
+        renderAll();
+        if(typeof sysStatus!=='undefined') sysStatus.textContent='تم تسجيل الدخول والحفظ أونلاين';
+      } catch(syncError) {
+        console.error('Post-login cloud sync failed:', syncError);
+        if(typeof sysStatus!=='undefined') sysStatus.textContent='تم الدخول لكن تعذر مزامنة البيانات';
+      }
 
     } catch (e) {
       errorBox.textContent = 'كلمة المرور غير صحيحة';
