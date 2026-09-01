@@ -588,7 +588,7 @@ function renderEmployees(){
 function renderPartners(){
  let hs=h('الشركاء'), rows=A('الشركاء');
  ph.innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>الأرباح</th><th>الإضافات</th><th>السحوبات</th><th>الرصيد الحالي</th><th>إجراء</th></tr>';
- pb.innerHTML=rows.map((p,i)=>{let mv=A('حركة الشركاء').filter(x=>x['الشريك']===p['الشريك']);let profit=mv.reduce((s,x)=>s+(Number(x['ربح من العربيات'])||0),0),add=mv.reduce((s,x)=>s+(Number(x['الإضافة الكلية'])||0),0),wd=mv.reduce((s,x)=>s+(Number(x['السحب الكلي'])||0),0),bal=(Number(p['إجمالي المبلغ المسجل'])||0)+profit+add-wd;return '<tr>'+hs.map(x=>`<td>${esc(p[x])}</td>`).join('')+`<td>${money(profit)}</td><td>${money(add)}</td><td>${money(wd)}</td><td><b>${money(bal)}</b></td><td><button class="btn" onclick="edit('الشركاء',${i})">تعديل</button> <button class="btn danger" onclick="del('الشركاء',${i})">حذف</button></td></tr>`}).join('')||'<tr><td colspan="9" class="empty">لا توجد بيانات</td></tr>';
+ pb.innerHTML=rows.map((p,i)=>{const st=partnerStats(p);return '<tr>'+hs.map(x=>`<td>${esc(p[x])}</td>`).join('')+`<td>${money(st.profit)}</td><td>${money(st.deposits)}</td><td>${money(st.withdrawals)}</td><td><b>${money(st.finalBalance)}</b></td><td><button class="btn" onclick="edit('الشركاء',${i})">تعديل</button> <button class="btn danger" onclick="del('الشركاء',${i})">حذف</button></td></tr>`}).join('')||'<tr><td colspan="9" class="empty">لا توجد بيانات</td></tr>';
 }
 function renderAll(){renderDash();renderCars();renderRequests();renderPartners();table('مساهمات العربيات','ch','cb');table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderEmployees();renderOriginal();let __cap=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0),__stock=A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0),__cash=bookCashBalance(),__def=recoverableTotal();cashCurrent.textContent=money(__cash);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(__def);if(typeof cashReal!=='undefined')cashReal.textContent=money(__cash-__def)}
 const fields={
@@ -641,8 +641,12 @@ async function saveModal(){
 }
  if(ctx.type==='car'){
    const pcs=[...document.querySelectorAll('.pc')].map(x=>({name:x.dataset.partner,amount:Number(x.value)||0})).filter(x=>x.amount>0);
-   // عند تعديل عربية: أعد توزيع مساهمتها بدون تكرار المبلغ القديم على الشريك.
    const oldCar=ctx.index!=null?A('العربيات')[ctx.index]:null;
+   if(!isNew && oldCar && sold(oldCar)){
+     const oldSale=Number(oldCar['سعر البيع'])||0, newSale=Number(obj['سعر البيع'])||0, oldCom=Number(oldCar['عمولة البيع'])||0, newCom=Number(obj['عمولة البيع'])||0;
+     if(oldSale!==newSale || oldCom!==newCom){ alert('العربية المباعة لا يمكن تعديل سعر بيعها أو عمولة بيعها من شاشة التعديل. احذف البيع وأعد تسجيله حتى يتم تحديث الأرباح وحركة الخزنة بشكل صحيح.'); return; }
+   }
+   // عند تعديل عربية: أعد توزيع مساهمتها بدون تكرار المبلغ القديم على الشريك.
    const oldParts={};
    String(oldCar?.['مساهمات الشركاء']||'').split('|').forEach(x=>{const m=x.trim().match(/^(.+?):\s*([\d.,]+)/);if(m)oldParts[m[1].trim()]=Number(m[2].replace(/,/g,''))||0});
    const names=new Set([...Object.keys(oldParts),...A('الشركاء').map(p=>p['الشريك'])]);
@@ -661,6 +665,11 @@ async function saveModal(){
  }
  const isNew=ctx.index==null;
  if(ctx.type==='refund'){ const amount=Math.max(0,Number(obj['المبلغ'])||0), recovered=Math.max(0,Number(obj['تم استرداده'])||0); if(amount<=0){alert('مبلغ تسترد يجب أن يكون أكبر من صفر');return;} if(recovered>amount){alert('المبلغ المسترد لا يمكن أن يكون أكبر من أصل المبلغ');return;} obj['المبلغ']=amount; obj['تم استرداده']=recovered; obj['المتبقي']=amount-recovered; }
+ if(ctx.type==='partner'){
+   const capital=Number(obj['إجمالي المبلغ المسجل'])||0, invested=Number(obj['الموزع على العربيات'])||0;
+   if(capital<0 || invested<0 || invested>capital){alert('بيانات الشريك غير صحيحة: رأس المال والموزع يجب أن يكونا موجبين، والموزع لا يتجاوز رأس المال.');return;}
+   obj['غير موزع']=capital-invested;
+ }
  if(ctx.type==='employee' && !obj['الموظف']) return alert('اكتب اسم الموظف');
  if(ctx.type==='employee_tx' && (!obj['الموظف'] || !(Number(obj['المبلغ'])>0))) return alert('اختار الموظف واكتب مبلغ صحيح');
  if(isNew){ if(ctx.type==='car' && !obj.id)obj.id=nextLocalId('العربيات'); a.push(obj); }else{ obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet); a[ctx.index]=obj; }
@@ -776,8 +785,22 @@ function distributeSaleProfit(c,p,showroomActual){
   const raw=String(c['مساهمات الشركاء']||'');
   const parts={}; raw.split('|').forEach(x=>{const m=x.trim().match(/^(.+?):\s*([\d.,]+)/);if(m)parts[m[1].trim()]=Number(m[2].replace(/,/g,''))||0});
   const total=Object.values(parts).reduce((a,b)=>a+b,0);
-  if(p>0&&total>0){ const targetShowroom=p/3; const actualShowroom=(Number.isFinite(Number(showroomActual))&&Number(showroomActual)>=0)?Math.min(Number(showroomActual),p):targetShowroom; const partnerPool=Math.max(0,p-actualShowroom); const mv=A('حركة الشركاء'); for(const [name,amt] of Object.entries(parts)){ const share=partnerPool*amt/total; const last=mv.filter(x=>x['الشريك']===name).at(-1); const prevBal=Number(last?.['الرصيد'])||Number(A('الشركاء').find(p=>p['الشريك']===name)?.['إجمالي المبلغ المسجل'])||0; mv.push({'الشريك':name,'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'ربح','البيان':'ربح من '+c['العربية'],'المبلغ':share,'ربح من العربيات':share,'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':prevBal+share}); } }
-  return p/3;
+  const targetShowroom=p/3;
+  const actualShowroom=(Number.isFinite(Number(showroomActual))&&Number(showroomActual)>=0)?Math.min(Number(showroomActual),Math.max(0,p)):targetShowroom;
+  const partnerPool=Math.max(0,p-actualShowroom);
+  c['ثلث المعرض']=actualShowroom;
+  c['ثلثان للشركاء']=partnerPool;
+  if(p>0&&total>0){
+    const mv=A('حركة الشركاء');
+    for(const [name,amt] of Object.entries(parts)){
+      const share=partnerPool*amt/total;
+      if(share<=0) continue;
+      const last=mv.filter(x=>x['الشريك']===name).at(-1);
+      const prevBal=Number(last?.['الرصيد'])||Number(A('الشركاء').find(p=>p['الشريك']===name)?.['إجمالي المبلغ المسجل'])||0;
+      mv.push({'الشريك':name,'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'ربح','البيان':'ربح من '+c['العربية'],'المبلغ':share,'ربح من العربيات':share,'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':prevBal+share});
+    }
+  }
+  return actualShowroom;
 }
 function saveSale(){
  let i=Number(sc.value),c=A('العربيات')[i],sell=Number(sp.value)||0,com=Number(scom.value)||0;
@@ -820,14 +843,21 @@ function saveWithdraw(){
   if(amt>current)return alert('مبلغ السحب أكبر من رصيد الشريك الحالي');
   const date=wd.value||new Date().toISOString().slice(0,10);
   partner['إجمالي المبلغ المسجل']=current-amt;
-  partner['غير موزع']=Math.max(0,(current-amt)-(Number(partner['الموزع على العربيات'])||0));
+  partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
   A('حركة الشركاء').push({'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':current-amt});
   A('حركة الخزنة').push({'التاريخ':date,'نوع الحركة':'سحب شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':cashBalance()-amt,'ملاحظات':wn.value||''});
   save(); closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة');
 }
 function cashModal(){cd.value=new Date().toISOString().slice(0,10);ct.value='';ci.value='';ca.value='';cin.value=0;cout.value=0;cn.value='';cashBox.classList.remove('hidden')}
 function closeCash(){cashBox.classList.add('hidden')}
-function saveCash(){let a=A('حركة الخزنة'),bal=cashBalance(),inn=Number(cin.value)||0,out=Number(cout.value)||0;a.push({'التاريخ':cd.value,'نوع الحركة':ct.value,'العربية/البند':ci.value,'المبلغ':Number(ca.value)||0,'داخل':inn,'خارج':out,'الرصيد':bal+inn-out,'ملاحظات':cn.value});save();closeCash();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تحديث الخزنة'}
+function saveCash(){
+  let a=A('حركة الخزنة'),bal=cashBalance(),inn=Math.max(0,Number(cin.value)||0),out=Math.max(0,Number(cout.value)||0);
+  if(inn>0&&out>0)return alert('الحركة الواحدة لازم تكون إما دخول أو خروج، وليس الاثنين معًا.');
+  if(inn===0&&out===0)return alert('اكتب مبلغ الدخول أو مبلغ الخروج.');
+  const flow=inn-out, amount=Math.abs(flow);
+  a.push({'التاريخ':cd.value,'نوع الحركة':ct.value,'العربية/البند':ci.value,'المبلغ':amount,'داخل':inn,'خارج':out,'الرصيد':bal+flow,'ملاحظات':cn.value});
+  save();closeCash();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تحديث الخزنة';
+}
 function backup(){let b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='TN-Auto-System-backup.json';a.click()}
 function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{S=JSON.parse(r.result);save();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الاسترجاع';alert('تم الاسترجاع')}catch{alert('ملف غير صالح')}};r.readAsText(f)}
 renderAll();
