@@ -447,6 +447,12 @@ function match(r){
     return true;
   });
 }
+function renderAlerts(){
+ const box=document.getElementById('alerts'); if(!box)return;
+ const matches=activeReq().map(r=>({r,cars:match(r)})).filter(x=>x.cars.length);
+ const badge=document.getElementById('km'); if(badge) badge.textContent=matches.length;
+ box.innerHTML=matches.length?matches.map(x=>{const names=x.cars.map(c=>'<b>'+esc(c['العربية']||'')+'</b>'+(c['الموديل']?' — '+esc(c['الموديل']):'')).join('، ');return '<div class="alert ok" style="cursor:pointer" onclick="show(\'requests\')">🔔 <b>'+esc(x.r['اسم العميل']||'عميل')+'</b> — طلب: '+esc(x.r['السيارة المطلوبة']||'')+(x.r['الموديل']?' '+esc(x.r['الموديل']):'')+' — <b>متاح لدينا:</b> '+names+'</div>';}).join(''):'<div class="alert">لا توجد مطابقة حالياً.</div>';
+}
 function activeReq(){return A('طلبات العملاء').filter(r=>!['تم البيع','مغلق'].includes(String(r['الحالة']||'')))}
 function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));document.getElementById(p).classList.remove('hidden');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.p===p));title.textContent=P[p];renderAll()}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.p));
@@ -460,7 +466,7 @@ const cap=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبل
 const ref=ds&&Number.isFinite(Number(ds.recoverable_amount))?Number(ds.recoverable_amount):recoverableTotal();
 const cash=ds&&Number.isFinite(Number(ds.base_cash))?Number(ds.base_cash):bookCashBalance();
 const realCash=cash-ref;
-kc.textContent=cars.length;klisted.textContent=listed.length;ks.textContent=money(stock);kcash.textContent=money(cash);if(typeof krealcash!=='undefined')krealcash.textContent=money(realCash);kr.textContent=rq.length;km.textContent=mat.length;kcap.textContent=money(cap);kref.textContent=money(ref);alerts.innerHTML=(mat.length?mat.map(r=>{const ms=match(r);const names=ms.map(c=>esc(c['العربية'])+(c['الموديل']?' — '+esc(c['الموديل']):'')).join('، ');return `<div class="alert ok">🔔 <b>${esc(r['اسم العميل'])}</b> — طلب: ${esc(r['السيارة المطلوبة'])} ${esc(r['الموديل'])} — <b>متاح لدينا:</b> ${names}</div>`}).join(''):'<div class="alert">لا توجد مطابقة حالياً.</div>');dashReq.innerHTML=rq.map(r=>`<tr><td>${esc(r['اسم العميل'])}</td><td>${esc(r['السيارة المطلوبة'])}</td><td>${esc(r['الموديل'])}</td><td>${money(r['الميزانية'])}</td><td>${match(r).length?'<span class="tag ok">🔔 مطابقة</span>':'<span class="tag warn">انتظار</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد طلبات</td></tr>'}
+kc.textContent=cars.length;klisted.textContent=listed.length;ks.textContent=money(stock);kcash.textContent=money(cash);if(typeof krealcash!=='undefined')krealcash.textContent=money(realCash);kr.textContent=rq.length;km.textContent=mat.length;kcap.textContent=money(cap);kref.textContent=money(ref);renderAlerts();dashReq.innerHTML=rq.map(r=>`<tr><td>${esc(r['اسم العميل'])}</td><td>${esc(r['السيارة المطلوبة'])}</td><td>${esc(r['الموديل'])}</td><td>${money(r['الميزانية'])}</td><td>${match(r).length?'<span class="tag ok">🔔 مطابقة</span>':'<span class="tag warn">انتظار</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد طلبات</td></tr>'}
 function renderCars(){let q=(cq.value||'');table('العربيات','carh','carb',q)}
 function renderRequests(){let q=(rq.value||''),hs=h('طلبات العملاء'),rs=A('طلبات العملاء').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())));reqh.innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>مطابقة</th><th>إجراء</th></tr>';reqb.innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td>${match(r).length?'<span class="tag ok">🔔 '+match(r).length+'</span>':'<span class="tag warn">لا توجد</span>'}</td><td><button class="btn" onclick="edit('طلبات العملاء',${i})">تعديل</button> <button class="btn danger" onclick="del('طلبات العملاء',${i})">حذف</button></td></tr>`).join('')||'<tr><td colspan="15" class="empty">لا توجد طلبات</td></tr>'}
 function partnerStats(p){
