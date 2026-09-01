@@ -4,36 +4,37 @@
 *{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:#172033}.side{position:fixed;right:0;top:0;bottom:0;width:255px;background:var(--nav);color:#fff;padding:18px 13px;overflow:auto}.brand{font-size:21px;font-weight:800;padding:8px 10px 20px}.nav button{width:100%;border:0;background:transparent;color:#d0d5dd;text-align:right;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer}.nav button:hover,.nav button.active{background:#1d2939;color:#fff}.group{font-size:11px;color:#98a2b3;margin:15px 10px 5px}.main{margin-right:255px;padding:22px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:4px 0;color:var(--muted);font-size:12px}.actions{display:flex;gap:7px}.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;cursor:pointer;font-weight:700}.primary{background:var(--blue);border-color:var(--blue);color:#fff}.danger{color:#b42318}.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}.label{font-size:12px;color:var(--muted)}.num{font-size:24px;font-weight:800;margin-top:7px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}.page.hidden{display:none}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.search{flex:1;min-width:250px;padding:9px;border:1px solid var(--line);border-radius:9px}.tablewrap{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:10px}.table{border-collapse:collapse;width:100%;font-size:12px}.table th,.table td{padding:9px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}.table th{background:#f8fafc;position:sticky;top:0}.tag{padding:4px 8px;border-radius:99px;font-size:11px;background:#eef4ff;color:#175cd3}.tag.ok{background:#ecfdf3;color:#067647}.tag.warn{background:#fffaeb;color:#b54708}.alert{padding:11px;border:1px solid #fedf89;background:#fffaeb;border-radius:10px;margin:7px 0}.alert.ok{background:#ecfdf3;border-color:#abefc6}.empty{text-align:center;color:var(--muted);padding:28px}.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}.modal.hidden{display:none}.modalbox{background:#fff;border-radius:16px;padding:20px;width:min(1000px,100%);max-height:92vh;overflow:auto}.form{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.field label{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.field input,.field select,.field textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px}.field textarea{min-height:70px}.span3{grid-column:1/-1}.span2{grid-column:span 2}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.footer{font-size:11px;color:var(--muted);margin-top:14px}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}@media(max-width:760px){.side{display:none}.main{margin:0;padding:12px}.cards{grid-template-columns:repeat(2,1fr)}.form{grid-template-columns:1fr}.span2,.span3{grid-column:1}.search{min-width:150px}}
 
-/* ===== TN Auto safe report printing ===== */
+/* ===== TN Auto professional A4 report printing ===== */
 @media print{
-  @page{size:A4 portrait;margin:5mm}
-  html,body{background:#fff!important;color:#111!important;margin:0!important;padding:0!important}
+  @page{size:A4 portrait;margin:0}
+  html,body{background:#fff!important;color:#111!important;margin:0!important;padding:0!important;width:210mm!important;min-height:297mm!important}
   body *{visibility:hidden!important}
   #tn-print-root,#tn-print-root *{visibility:visible!important}
-  #tn-print-root{display:block!important;position:absolute!important;left:0!important;top:0!important;width:190mm!important;height:287mm!important;overflow:hidden!important;background:#fff!important}
-  .tn-print-sheet{display:flex!important;flex-direction:column;width:190mm!important;height:287mm!important;max-height:287mm!important;overflow:hidden!important;font-family:Tahoma,Arial,sans-serif;direction:rtl;background:#fff!important}
-  .tn-print-header{text-align:center;padding:1mm 0 2mm;border-bottom:1px solid #222;margin-bottom:2mm}
-  .tn-print-header img{width:48mm;height:31mm;object-fit:contain;display:block;margin:0 auto 1mm}
-  .tn-print-header .company{font-size:13pt;font-weight:800}
-  .tn-print-header .title{font-size:10pt;font-weight:700;margin-top:1mm}
-  .tn-print-header .date{font-size:7pt;color:#555;margin-top:.5mm}
-  .tn-print-body{flex:1;min-height:0;overflow:hidden!important;font-size:7pt!important}
+  #tn-print-root{display:block!important;position:absolute!important;left:0!important;top:0!important;width:210mm!important;height:297mm!important;overflow:hidden!important;background:#fff!important;margin:0!important;padding:0!important}
+  .tn-print-sheet{box-sizing:border-box!important;display:flex!important;flex-direction:column;width:210mm!important;height:297mm!important;max-height:297mm!important;overflow:hidden!important;padding:7mm 8mm 5mm!important;margin:0!important;font-family:Tahoma,Arial,sans-serif;direction:rtl;background:#fff!important}
+  .tn-print-header{text-align:center;padding:0 0 2mm!important;border-bottom:1px solid #222!important;margin:0 0 2mm!important;flex:0 0 auto!important}
+  .tn-print-header img{width:42mm!important;height:24mm!important;object-fit:cover!important;display:block!important;margin:0 auto 1mm!important}
+  .tn-print-header .company{font-size:12pt!important;font-weight:800!important;line-height:1.1!important}
+  .tn-print-header .title{font-size:9pt!important;font-weight:700!important;margin-top:1mm!important}
+  .tn-print-header .date{font-size:6.5pt!important;color:#555!important;margin-top:.5mm!important}
+  .tn-print-body{flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;font-size:6.2pt!important}
   .tn-print-body .panel{border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;background:#fff!important}
-  .tn-print-body .cards{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:1.5mm!important;margin-bottom:2mm!important}
-  .tn-print-body .card{border:1px solid #aaa!important;border-radius:2px!important;padding:1.5mm!important}
-  .tn-print-body .label{font-size:6.5pt!important}
-  .tn-print-body .num{font-size:10.5pt!important;margin-top:.7mm!important}
-  .tn-print-body h2{font-size:10pt!important;margin:1mm 0!important}
-  .tn-print-body h3{font-size:8pt!important;margin:1.5mm 0 1mm!important}
+  .tn-print-body .panel>h2{font-size:10pt!important;margin:0 0 1.5mm!important}
+  .tn-print-body .cards{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:1.2mm!important;margin-bottom:1.5mm!important}
+  .tn-print-body .card{border:1px solid #aaa!important;border-radius:2px!important;padding:1.1mm!important}
+  .tn-print-body .label{font-size:6pt!important}
+  .tn-print-body .num{font-size:9.5pt!important;margin-top:.4mm!important}
+  .tn-print-body h2{font-size:9.5pt!important;margin:1mm 0!important}
+  .tn-print-body h3{font-size:7.5pt!important;margin:1mm 0 .7mm!important}
   .tn-print-body .tablewrap{overflow:visible!important;max-height:none!important;border:1px solid #999!important;border-radius:0!important}
-  .tn-print-body .table{width:100%!important;border-collapse:collapse!important;font-size:6.4pt!important}
-  .tn-print-body .table th,.tn-print-body .table td{padding:1mm!important;line-height:1.08!important;white-space:normal!important;border-bottom:1px solid #ddd!important}
+  .tn-print-body .table{width:100%!important;border-collapse:collapse!important;font-size:5.7pt!important;table-layout:auto!important}
+  .tn-print-body .table th,.tn-print-body .table td{padding:.65mm!important;line-height:1.02!important;white-space:normal!important;border-bottom:1px solid #ddd!important}
   .tn-print-body .table th{background:#f0f0f0!important;position:static!important}
-  .tn-print-body .toolbar,.tn-print-body .btn,.tn-print-body .report-print-controls,.tn-print-body .footer,.tn-print-body .page-footer,.tn-print-body .app-footer,.tn-print-body .generated-by,.tn-print-body .system-footer{display:none!important}
-  .tn-print-footer{border-top:1px solid #222;margin-top:2mm;padding-top:1mm;display:flex!important;align-items:center;justify-content:space-between;gap:5mm}
-  .tn-print-footer img{width:25mm;height:16mm;object-fit:contain;display:block}
-  .tn-print-footer .company{font-size:7pt;font-weight:700}
-  .tn-print-footer .contact{font-size:6.5pt;text-align:left;direction:ltr}
+  .tn-print-body .toolbar,.tn-print-body .btn,.tn-print-body .report-print-controls,.tn-print-body .footer,.tn-print-body .page-footer,.tn-print-body .app-footer,.tn-print-body .generated-by,.tn-print-body .system-footer,.tn-print-body .empty{display:none!important}
+  .tn-print-footer{box-sizing:border-box!important;border-top:1px solid #222!important;margin:2mm 0 0!important;padding:1mm 0 0!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:5mm!important;flex:0 0 auto!important;min-height:18mm!important}
+  .tn-print-footer img{width:27mm!important;height:14mm!important;object-fit:cover!important;display:block!important;margin:0!important}
+  .tn-print-footer .company{font-size:6.5pt!important;font-weight:700!important}
+  .tn-print-footer .contact{display:none!important}
   tr{break-inside:avoid!important;page-break-inside:avoid!important}
 }
 #tn-print-root{display:none}
@@ -752,8 +753,8 @@ function printCurrentReport(){
     </div>
     <div class="tn-print-body">${clone.innerHTML}</div>
     <div class="tn-print-footer">
-      <div><img src="tn-auto-print-logo.jpg" alt="EL TAWFIK TN AUTO"><div class="company">EL TAWFIK TN AUTO</div></div>
-      <div class="contact">TN Auto System</div>
+      <img src="tn-auto-print-logo.jpg" alt="EL TAWFIK TN AUTO">
+      <div></div>
     </div>
   </div>`;
   document.body.appendChild(root);
