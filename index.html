@@ -459,12 +459,11 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset
 function table(sheet,head,body,search=''){let hs=h(sheet), q=search.toLowerCase(),all=A(sheet),rs=all.map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q)));document.getElementById(head).innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>إجراء</th></tr>';document.getElementById(body).innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td><button class="btn" onclick="edit('${sheet}',${i})">تعديل</button> <button class="btn danger" onclick="del('${sheet}',${i})">حذف</button></td></tr>`).join('')||`<tr><td colspan="${hs.length+1}" class="empty">لا توجد بيانات</td></tr>`}
 function cashBalance(){return A('حركة الخزنة').reduce((bal,x)=>bal+(Number(x['داخل'])||0)-(Number(x['خارج'])||0),0)}
 function recoverableTotal(){return A('مبالغ تسترد').reduce((sum,r)=>{const amount=Math.max(0,Number(r['المبلغ'])||0);const recovered=Math.min(amount,Math.max(0,Number(r['تم استرداده'])||0));r['المتبقي']=Math.max(0,amount-recovered);return sum+r['المتبقي'];},0)}
-function bookCashBalance(){const partners=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0);const cars=A('العربيات');const inventory=cars.filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0)+(Number(x['عمولة الشراء'])||0),0);const saleCommissions=cars.filter(x=>Number(x['سعر البيع'])>0).reduce((s,x)=>s+(Number(x['عمولة البيع'])||0),0);const partnerMoves=A('حركة الشركاء');const deposits=partnerMoves.reduce((s,x)=>s+(String(x['نوع الحركة'])==='إضافة'?(Number(x['المبلغ'])||0):(Number(x['الإضافة الكلية'])||0)),0);const withdrawals=partnerMoves.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?(Number(x['المبلغ'])||0):(Number(x['السحب الكلي'])||0)),0);return partners+deposits-inventory-saleCommissions-withdrawals;}
+function bookCashBalance(){const partners=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0);const cars=A('العربيات');const inventory=cars.filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0)+(Number(x['عمولة الشراء'])||0),0);const saleCommissions=cars.filter(x=>Number(x['سعر البيع'])>0).reduce((s,x)=>s+(Number(x['عمولة البيع'])||0),0);return partners-inventory-saleCommissions;}
 function renderDash(){let cars=A('العربيات'),rq=activeReq(),mat=rq.filter(x=>match(x).length),listed=cars.filter(x=>!sold(x)),stock=listed.reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0);
-const ds=Array.isArray(window.__cloudSnapshot?.dashboard_settings)?window.__cloudSnapshot.dashboard_settings[0]:null;
 const cap=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0);
-const ref=ds&&Number.isFinite(Number(ds.recoverable_amount))?Number(ds.recoverable_amount):recoverableTotal();
-const cash=ds&&Number.isFinite(Number(ds.base_cash))?Number(ds.base_cash):bookCashBalance();
+const ref=recoverableTotal();
+const cash=bookCashBalance();
 const realCash=cash-ref;
 kc.textContent=cars.length;klisted.textContent=listed.length;ks.textContent=money(stock);kcash.textContent=money(cash);if(typeof krealcash!=='undefined')krealcash.textContent=money(realCash);kr.textContent=rq.length;km.textContent=mat.length;kcap.textContent=money(cap);kref.textContent=money(ref);renderAlerts();dashReq.innerHTML=rq.map(r=>`<tr><td>${esc(r['اسم العميل'])}</td><td>${esc(r['السيارة المطلوبة'])}</td><td>${esc(r['الموديل'])}</td><td>${money(r['الميزانية'])}</td><td>${match(r).length?'<span class="tag ok">🔔 مطابقة</span>':'<span class="tag warn">انتظار</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد طلبات</td></tr>'}
 function renderCars(){let q=(cq.value||'');table('العربيات','carh','carb',q)}
@@ -488,10 +487,9 @@ function partnerStats(p){
   const profit=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='ربح'?Number(x['المبلغ'])||0:Number(x['ربح من العربيات'])||0),0);
   const deposits=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='إضافة'?Number(x['المبلغ'])||0:Number(x['الإضافة الكلية'])||0),0);
   const withdrawals=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:Number(x['السحب الكلي'])||0),0);
-  const baseCapital=Number(p['إجمالي المبلغ المسجل'])||0;
-  const capital=baseCapital+deposits;
-  const undistributed=Math.max(0,capital-invested-withdrawals);
-  const finalBalance=capital+profit-withdrawals;
+  const capital=Number(p['إجمالي المبلغ المسجل'])||0;
+  const undistributed=Math.max(0,capital-invested);
+  const finalBalance=capital+profit;
   return {name,partnerId,capital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
 }
 function renderProfits(){
