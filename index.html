@@ -663,7 +663,6 @@ async function saveModal(){
    let p=Number(obj['سعر البيع'])-Number(obj['سعر الشراء']||0)-Number(obj['عمولة الشراء']||0)-Number(obj['عمولة البيع']||0);
    obj['صافي الربح الحقيقي']=p;obj['ثلث المعرض']=p/3;obj['ثلثان للشركاء']=p*2/3;
  }
- const isNew=ctx.index==null;
  if(ctx.type==='refund'){ const amount=Math.max(0,Number(obj['المبلغ'])||0), recovered=Math.max(0,Number(obj['تم استرداده'])||0); if(amount<=0){alert('مبلغ تسترد يجب أن يكون أكبر من صفر');return;} if(recovered>amount){alert('المبلغ المسترد لا يمكن أن يكون أكبر من أصل المبلغ');return;} obj['المبلغ']=amount; obj['تم استرداده']=recovered; obj['المتبقي']=amount-recovered; }
  if(ctx.type==='partner'){
    const capital=Number(obj['إجمالي المبلغ المسجل'])||0, invested=Number(obj['الموزع على العربيات'])||0;
@@ -686,36 +685,52 @@ async function saveModal(){
  }
  if(ctx.type==='car'){ rebuildCarContributions(); }
  if(ctx.type==='request' && onlineMode && isNew){
-   const payload={
-     p_customer_name: obj['اسم العميل']||null, p_phone: obj['رقم التليفون']||null,
-     p_whatsapp: obj['رقم التليفون']||null, p_city:null,
-     p_customer_notes:obj['ملاحظات']||null, p_desired_make:obj['السيارة المطلوبة']||null,
-     p_desired_model:obj['الموديل']||null, p_desired_year_from:Number(obj['السنة من'])||null,
-     p_desired_year_to:Number(obj['السنة إلى'])||null, p_budget_min:Number(obj['الميزانية من'])||Number(obj['الميزانية'])||0,
-     p_budget_max:Number(obj['الميزانية إلى'])||Number(obj['الميزانية'])||0, p_color:obj['اللون']||null,
-     p_request_notes:obj['ملاحظات']||null, p_status:toDbRequestStatus(obj['الحالة'])
-   };
-   const {data,error}=await sb.rpc('save_vehicle_request',payload);
-   if(error){
+   // حفظ طلب العميل مباشرة في Supabase بدل RPC القديم الذي كان يفشل.
+   try{
+     const name=obj['اسم العميل']||null, phone=obj['رقم التليفون']||null;
+     let customerId=null;
+     if(phone){
+       const {data:existing,error:findErr}=await sb.from('customers').select('id').eq('phone',phone).limit(1).maybeSingle();
+       if(findErr) throw findErr;
+       customerId=existing?.id||null;
+     }
+     if(!customerId){
+       const {data:maxRows,error:maxErr}=await sb.from('customers').select('id').order('id',{ascending:false}).limit(1);
+       if(maxErr) throw maxErr;
+       customerId=(Number(maxRows?.[0]?.id)||0)+1;
+       const {error:customerErr}=await sb.from('customers').insert({id:customerId,name:name||'عميل',phone:phone,whatsapp:phone,notes:obj['ملاحظات']||null});
+       if(customerErr) throw customerErr;
+     }
+     const {data:reqMaxRows,error:reqMaxErr}=await sb.from('vehicle_requests').select('id').order('id',{ascending:false}).limit(1);
+     if(reqMaxErr) throw reqMaxErr;
+     const requestId=(Number(reqMaxRows?.[0]?.id)||0)+1;
+     const row={
+       id:requestId,customer_id:customerId,customer_name:name,customer_phone:phone,
+       request_date:obj['التاريخ']||new Date().toISOString().slice(0,10),
+       desired_make:obj['السيارة المطلوبة']||null,desired_model:obj['الموديل']||null,
+       desired_year_from:Number(obj['السنة من'])||null,desired_year_to:Number(obj['السنة إلى'])||null,
+       budget_min:Number(obj['الميزانية من'])||Number(obj['الميزانية'])||0,
+       budget_max:Number(obj['الميزانية إلى'])||Number(obj['الميزانية'])||0,
+       payment_method:obj['كاش/تقسيط']||null,down_payment:Number(obj['المقدم'])||0,
+       color:obj['اللون']||null,notes:obj['ملاحظات']||null,status:toDbRequestStatus(obj['الحالة']),responsible:obj['مسؤول الطلب']||null
+     };
+     const {error:reqErr}=await sb.from('vehicle_requests').insert(row);
+     if(reqErr) throw reqErr;
+     obj.id=requestId;
+     window.__requestCustomerMap=window.__requestCustomerMap||{};
+     window.__requestCustomerMap[String(requestId)]=customerId;
      localStorage.setItem(KEY,JSON.stringify(S));
-     console.error('save_vehicle_request RPC error',error);
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
+     closeModal();renderAll();
+     alert('تم حفظ طلب العميل أونلاين بنجاح.');
+     return;
+   }catch(error){
+     console.error('Direct customer request save error',error);
+     localStorage.setItem(KEY,JSON.stringify(S));
      if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ طلب العميل أونلاين';
-     alert('لم يتم حفظ طلب العميل أونلاين.\n\n'+(error.message||error));
+     alert('لم يتم حفظ طلب العميل أونلاين.\n\n'+(error?.message||error));
      return;
    }
-   obj.id=Number(data)||nextLocalId('طلبات العملاء');
-   try{
-     const {data:cloudRow,error:rowError}=await sb.from('vehicle_requests').select('id,customer_id').eq('id',obj.id).single();
-     if(!rowError && cloudRow){
-       window.__requestCustomerMap=window.__requestCustomerMap||{};
-       window.__requestCustomerMap[String(obj.id)]=cloudRow.customer_id;
-     }
-   }catch(e){ console.warn('Could not cache customer relation for request',e); }
-   localStorage.setItem(KEY,JSON.stringify(S));
-   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
-   closeModal();renderAll();
-   alert('تم حفظ طلب العميل أونلاين بنجاح.');
-   return;
  }
  save();closeModal();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ';
 }
