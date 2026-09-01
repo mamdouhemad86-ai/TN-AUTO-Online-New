@@ -487,9 +487,12 @@ function partnerStats(p){
   const mv=A('حركة الشركاء').filter(x=>String(x['الشريك']||'')===name);
   const profit=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='ربح'?Number(x['المبلغ'])||0:Number(x['ربح من العربيات'])||0),0);
   const deposits=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='إضافة'?Number(x['المبلغ'])||0:Number(x['الإضافة الكلية'])||0),0);
-  const withdrawals=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:Number(x['السحب الكلي'])||0),0);
   const capital=Number(p['إجمالي المبلغ المسجل'])||0;
-  const baseCapital=Number(p['رأس المال الأساسي'])||capital+withdrawals;
+  const baseCapital=Number(p['رأس المال الأساسي'])||capital;
+  // المسحوبات تُحسب من الفرق بين رأس المال الأساسي والرصيد الحالي.
+  // عرضها في التقرير لا ينقص الكاش مرة أخرى؛ حركة الخزنة هي التي تسجل الدفع الفعلي.
+  const ledgerWithdrawals=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?(Number(x['المبلغ'])||0):0),0);
+  const withdrawals=Math.max(0,baseCapital-capital,ledgerWithdrawals);
   const undistributed=Math.max(0,capital-invested);
   const finalBalance=capital+profit;
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
@@ -575,6 +578,7 @@ function showPartnerDetail(index){
   html+='<div class="panel"><h3>فلوس الشريك الموجودة حاليًا في العربيات</h3><div class="tablewrap"><table class="table"><thead><tr><th>العربية</th><th>الموديل</th><th>مساهمة الشريك</th><th>نسبة المساهمة</th></tr></thead><tbody>';
   html+=st.currentCars.map(x=>{const total=Number(x.car['سعر الشراء'])||0;const pct=total?x.amount/total*100:0;return `<tr><td>${esc(x.car['العربية'])}</td><td>${esc(x.car['الموديل']||'')}</td><td>${money(x.amount)}</td><td>${pct.toFixed(2)}%</td></tr>`}).join('')||'<tr><td colspan="4" class="empty">لا توجد مساهمات حالية في عربيات موجودة</td></tr>';
   html+='</tbody></table></div></div>';
+  html+=`<div class="note" style="margin-top:14px">المسحوبات المسجلة: <b>${money(st.withdrawals)}</b> — تم خصمها من رصيد الشريك فقط، ولا يتم خصمها مرة ثانية من كاش الخزنة عند عرض التقرير.</div>`;
   html+='<div class="panel" style="margin-top:14px"><h3>حركة الشريك</h3><div class="tablewrap"><table class="table"><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>';
   html+=st.mv.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${esc(x['البيان']||'')}</td><td>${money(x['المبلغ'])}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">لا توجد حركة مسجلة</td></tr>';
   html+='</tbody></table></div></div>';
