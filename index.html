@@ -4,41 +4,40 @@
 *{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:#172033}.side{position:fixed;right:0;top:0;bottom:0;width:255px;background:var(--nav);color:#fff;padding:18px 13px;overflow:auto}.brand{font-size:21px;font-weight:800;padding:8px 10px 20px}.nav button{width:100%;border:0;background:transparent;color:#d0d5dd;text-align:right;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer}.nav button:hover,.nav button.active{background:#1d2939;color:#fff}.group{font-size:11px;color:#98a2b3;margin:15px 10px 5px}.main{margin-right:255px;padding:22px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:4px 0;color:var(--muted);font-size:12px}.actions{display:flex;gap:7px}.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;cursor:pointer;font-weight:700}.primary{background:var(--blue);border-color:var(--blue);color:#fff}.danger{color:#b42318}.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}.label{font-size:12px;color:var(--muted)}.num{font-size:24px;font-weight:800;margin-top:7px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}.page.hidden{display:none}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.search{flex:1;min-width:250px;padding:9px;border:1px solid var(--line);border-radius:9px}.tablewrap{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:10px}.table{border-collapse:collapse;width:100%;font-size:12px}.table th,.table td{padding:9px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}.table th{background:#f8fafc;position:sticky;top:0}.tag{padding:4px 8px;border-radius:99px;font-size:11px;background:#eef4ff;color:#175cd3}.tag.ok{background:#ecfdf3;color:#067647}.tag.warn{background:#fffaeb;color:#b54708}.alert{padding:11px;border:1px solid #fedf89;background:#fffaeb;border-radius:10px;margin:7px 0}.alert.ok{background:#ecfdf3;border-color:#abefc6}.empty{text-align:center;color:var(--muted);padding:28px}.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}.modal.hidden{display:none}.modalbox{background:#fff;border-radius:16px;padding:20px;width:min(1000px,100%);max-height:92vh;overflow:auto}.form{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.field label{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.field input,.field select,.field textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px}.field textarea{min-height:70px}.span3{grid-column:1/-1}.span2{grid-column:span 2}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.footer{font-size:11px;color:var(--muted);margin-top:14px}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}@media(max-width:760px){.side{display:none}.main{margin:0;padding:12px}.cards{grid-template-columns:repeat(2,1fr)}.form{grid-template-columns:1fr}.span2,.span3{grid-column:1}.search{min-width:150px}}
 
-/* ===== TN Auto professional report printing ===== */
+/* ===== TN Auto safe report printing ===== */
 @media print{
   @page{size:A4 portrait;margin:5mm}
   html,body{background:#fff!important;color:#111!important;margin:0!important;padding:0!important}
-  .side,.top,.actions,.nav,.toolbar,.btn,.modal,.footer,.page:not(#reports),
-  #reports>.panel>h2,.report-print-controls,.screen-only,.no-print{display:none!important}
-  #reports{display:block!important;margin:0!important;padding:0!important}
-  #reports>.panel{display:block!important;border:0!important;box-shadow:none!important;margin:0!important;padding:0!important}
-  .main{margin:0!important;padding:0!important;width:100%!important}
-  #reportOutput{display:block!important;width:100%!important}
-  .report-print-sheet{display:flex!important;flex-direction:column;width:100%!important;height:287mm!important;max-height:287mm!important;overflow:hidden!important;font-family:Tahoma,Arial,sans-serif;page-break-after:avoid!important;page-break-inside:avoid!important}
-  .report-print-header{text-align:center;padding:2mm 0 2.5mm;border-bottom:1px solid #222;margin-bottom:2.5mm}
-  .report-print-header img{width:42mm;height:22mm;object-fit:contain;display:block;margin:0 auto 1mm;border-radius:0}
-  .report-print-header .company{font-size:13pt;font-weight:800;letter-spacing:.2px}
-  .report-print-header .title{font-size:10.5pt;font-weight:700;margin-top:1mm}
-  .report-print-header .date{font-size:7.5pt;color:#555;margin-top:1mm}
-  .report-print-body{flex:1;min-height:0;overflow:hidden!important}
-  .report-print-body .panel{border:0!important;padding:0!important;margin:0!important}
-  .report-print-body .cards{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:2mm!important}
-  .report-print-body .card{border:1px solid #bbb!important;border-radius:3px!important;padding:2mm!important}
-  .report-print-body .label{font-size:7pt!important}
-  .report-print-body .num{font-size:12pt!important;margin-top:1mm!important}
-  .report-print-body .tablewrap{overflow:visible!important;max-height:none!important;border:1px solid #999!important;border-radius:0!important}
-  .report-print-body .table{width:100%!important;font-size:7pt!important}
-  .report-print-body .table th,.report-print-body .table td{white-space:normal!important;padding:1.4mm!important;line-height:1.15!important;border-bottom:1px solid #ddd!important}
-  .report-print-body .table th{background:#eee!important;position:static!important}
-  .report-print-body h3{font-size:8.5pt!important;margin:2mm 0 1.5mm!important}
-  .report-print-footer{text-align:center;border-top:1px solid #222;margin-top:2.5mm;padding-top:1.5mm}
-  .report-print-footer img{width:30mm;height:14mm;object-fit:contain;display:block;margin:0 auto .5mm;border-radius:0}
-  .report-print-footer .company{font-size:7.5pt;font-weight:700}
-  .report-print-body .footer,.report-print-body .page-footer,.report-print-body .app-footer,.report-print-body .generated-by,.report-print-body .system-footer{display:none!important}
-  tr{break-inside:avoid;page-break-inside:avoid}
+  body *{visibility:hidden!important}
+  #tn-print-root,#tn-print-root *{visibility:visible!important}
+  #tn-print-root{display:block!important;position:absolute!important;left:0!important;top:0!important;width:190mm!important;height:287mm!important;overflow:hidden!important;background:#fff!important}
+  .tn-print-sheet{display:flex!important;flex-direction:column;width:190mm!important;height:287mm!important;max-height:287mm!important;overflow:hidden!important;font-family:Tahoma,Arial,sans-serif;direction:rtl;background:#fff!important}
+  .tn-print-header{text-align:center;padding:1mm 0 2mm;border-bottom:1px solid #222;margin-bottom:2mm}
+  .tn-print-header img{width:48mm;height:31mm;object-fit:contain;display:block;margin:0 auto 1mm}
+  .tn-print-header .company{font-size:13pt;font-weight:800}
+  .tn-print-header .title{font-size:10pt;font-weight:700;margin-top:1mm}
+  .tn-print-header .date{font-size:7pt;color:#555;margin-top:.5mm}
+  .tn-print-body{flex:1;min-height:0;overflow:hidden!important;font-size:7pt!important}
+  .tn-print-body .panel{border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;background:#fff!important}
+  .tn-print-body .cards{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:1.5mm!important;margin-bottom:2mm!important}
+  .tn-print-body .card{border:1px solid #aaa!important;border-radius:2px!important;padding:1.5mm!important}
+  .tn-print-body .label{font-size:6.5pt!important}
+  .tn-print-body .num{font-size:10.5pt!important;margin-top:.7mm!important}
+  .tn-print-body h2{font-size:10pt!important;margin:1mm 0!important}
+  .tn-print-body h3{font-size:8pt!important;margin:1.5mm 0 1mm!important}
+  .tn-print-body .tablewrap{overflow:visible!important;max-height:none!important;border:1px solid #999!important;border-radius:0!important}
+  .tn-print-body .table{width:100%!important;border-collapse:collapse!important;font-size:6.4pt!important}
+  .tn-print-body .table th,.tn-print-body .table td{padding:1mm!important;line-height:1.08!important;white-space:normal!important;border-bottom:1px solid #ddd!important}
+  .tn-print-body .table th{background:#f0f0f0!important;position:static!important}
+  .tn-print-body .toolbar,.tn-print-body .btn,.tn-print-body .report-print-controls,.tn-print-body .footer,.tn-print-body .page-footer,.tn-print-body .app-footer,.tn-print-body .generated-by,.tn-print-body .system-footer{display:none!important}
+  .tn-print-footer{border-top:1px solid #222;margin-top:2mm;padding-top:1mm;display:flex!important;align-items:center;justify-content:space-between;gap:5mm}
+  .tn-print-footer img{width:25mm;height:16mm;object-fit:contain;display:block}
+  .tn-print-footer .company{font-size:7pt;font-weight:700}
+  .tn-print-footer .contact{font-size:6.5pt;text-align:left;direction:ltr}
+  tr{break-inside:avoid!important;page-break-inside:avoid!important}
 }
-.report-print-sheet{display:none}
-
+#tn-print-root{display:none}
+</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">function realCashBalance(){const capital=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0)+A('حركة الشركاء').reduce((s,x)=>{const t=String(x['نوع الحركة']);return s+(t==='إضافة'?(Number(x['المبلغ'])||0):(t==='سحب'?-(Number(x['المبلغ'])||0):0));},0);const carsValue=A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0);const outstanding=A('المبالغ المستردة').reduce((s,x)=>s+(Number(x['المبلغ'])||0)-(Number(x['المسترد'])||0),0);return capital-carsValue-outstanding;}</script>
 
 <script>
@@ -358,7 +357,7 @@ function initOnline(){
 <section id="profits" class="page hidden"><div class="grid"><div class="panel"><h2>أرباح الشركاء</h2><div class="tablewrap"><table class="table"><thead id="prh"></thead><tbody id="prb"></tbody></table></div></div><div class="panel"><h2>ربح المعرض</h2><div class="tablewrap"><table class="table"><thead id="showh"></thead><tbody id="showb"></tbody></table></div></div></div></section>
 <section id="employees" class="page hidden"><div class="panel"><h2>الموظفين</h2><div class="toolbar"><button class="btn primary" onclick="modal('employee')">➕ موظف جديد</button><button class="btn" onclick="modal('employee_tx')">💰 حركة موظف</button></div><div class="tablewrap"><table class="table"><thead id="eh"></thead><tbody id="eb"></tbody></table></div></div><div class="panel" style="margin-top:14px"><h3>حركة الموظفين</h3><div class="tablewrap"><table class="table"><thead id="eth"></thead><tbody id="etb"></tbody></table></div></div></section><section id="reports" class="page hidden"><div class="panel"><h2>التقارير</h2><div class="toolbar"><button class="btn" onclick="renderReport('sales')">المبيعات</button><button class="btn" onclick="renderReport('stock')">المخزون</button><button class="btn" onclick="renderReport('customers')">العملاء</button><button class="btn" onclick="renderReport('partners')">الشركاء</button><button class="btn primary" onclick="renderPartnerDetailReport()">كشف شريك تفصيلي</button><button class="btn" onclick="renderReport('cash')">الخزنة</button><button class="btn" onclick="renderReport('employees')">الموظفين</button><button class="btn" onclick="renderReport('employee_tx')">حركة الموظفين</button><button class="btn primary report-print-controls" onclick="printCurrentReport()">🖨️ طباعة التقرير</button></div><div id="reportOutput"><div class="empty">اختار نوع التقرير</div></div></div></section>
 <section id="original" class="page hidden"><div class="panel"><h2>البيانات الأصلية من ملف Excel</h2><div id="orig"></div></div></section>
-</main>
+<div class="footer">الكاش الحقيقي = رصيد الخزنة الدفتري − العجز المتبقي في «مبالغ تسترد». البيانات الجديدة محفوظة محلياً على نفس الجهاز. عند نشر النظام على GitHub Pages، نحتاج قاعدة بيانات أونلاين إذا أردت استخدامها من أكثر من جهاز.</div></main>
 
 <div id="modalbox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2 id="mt"></h2><button class="btn" onclick="closeModal()">إغلاق</button></div><div id="mf"></div></div></div>
 <div id="salebox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💰 بيع عربية</h2><button class="btn" onclick="closeSale()">إغلاق</button></div><div class="form"><div class="field span2"><label>العربية</label><select id="sc"></select></div><div class="field"><label>سعر البيع</label><input id="sp" type="number"></div><div class="field"><label>عمولة البيع</label><input id="scom" type="number" value="0">
@@ -427,65 +426,6 @@ function renderProfits(){
   prh.innerHTML='<tr>'+hs.map(x=>`<th>${x}</th>`).join('')+'</tr>';
   prb.innerHTML=A('الشركاء').map(p=>{const st=partnerStats(p);return `<tr><td>${esc(st.name)}</td><td>${money(st.capital)}</td><td>${money(st.invested)}</td><td>${money(st.undistributed)}</td><td>${money(st.profit)}</td><td>${money(st.deposits)}</td><td>${money(st.withdrawals)}</td><td><b>${money(st.finalBalance)}</b></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">لا توجد بيانات</td></tr>';
   let c=A('العربيات').filter(x=>Number(x['سعر البيع'])>0),sh=['العربية','سعر الشراء','عمولة الشراء','سعر البيع','عمولة البيع','صافي الربح الحقيقي','ثلث المعرض'];showh.innerHTML='<tr>'+sh.map(x=>`<th>${x}</th>`).join('')+'</tr>';showb.innerHTML=c.map(x=>'<tr>'+sh.map(k=>`<td>${k==='العربية'?esc(x[k]):money(x[k])}</td>`).join('')+'</tr>').join('')||'<tr><td colspan="7" class="empty">لا توجد مبيعات</td></tr>';
-}
-function printCurrentReport(){
-  const report=document.getElementById('reportOutput');
-  if(!report){alert('لا يوجد تقرير للطباعة');return;}
-  const clone=report.cloneNode(true);
-  clone.querySelectorAll('.toolbar,.btn,.report-print-controls').forEach(el=>el.remove());
-  const detail=clone.querySelector('#partnerDetailBody');
-  if(detail){ clone.innerHTML=detail.innerHTML; }
-  clone.querySelectorAll('.footer,.page-footer,.app-footer,.generated-by,.system-footer').forEach(el=>el.remove());
-  const selected=document.getElementById('partnerDetailSelect');
-  let title=selected ? ('كشف شريك تفصيلي - '+(selected.options[selected.selectedIndex]?.text||'')) : (report.dataset.reportTitle||'تقرير TN Auto');
-  const html=`<div class="report-print-sheet">
-    <div class="report-print-header">
-      <img src="tn-auto-print-logo.jpg" alt="EL TAWFIK TN AUTO">
-      <div class="company">EL TAWFIK TN AUTO</div>
-      <div class="title">${esc(title)}</div>
-      <div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('en-GB')}</div>
-    </div>
-    <div class="report-print-body">${clone.innerHTML}</div>
-    <div class="report-print-footer">
-      <img src="tn-auto-print-logo.jpg" alt="EL TAWFIK TN AUTO">
-      <div class="company">EL TAWFIK TN AUTO</div>
-    </div>
-  </div>`;
-  const old=document.body.innerHTML;
-  document.body.innerHTML=html;
-  window.scrollTo(0,0);
-  const restore=()=>{document.body.innerHTML=old;window.removeEventListener('afterprint',restore);renderAll();};
-  window.addEventListener('afterprint',restore);
-  setTimeout(()=>window.print(),120);
-}
-
-function renderReport(type){
-  const out=document.getElementById('reportOutput'); if(!out)return;
-  const titles={sales:'تقرير المبيعات',stock:'تقرير المخزون',customers:'تقرير العملاء',partners:'تقرير الشركاء',cash:'تقرير الخزنة',employees:'تقرير الموظفين',employee_tx:'تقرير حركة الموظفين'};
-  out.dataset.reportTitle=titles[type]||'تقرير TN Auto';
-  let hs=[],rows=[];
-  if(type==='sales'){
-    hs=['العربية','الموديل','سعر الشراء','سعر البيع','صافي الربح الحقيقي'];
-    rows=A('العربيات').filter(x=>Number(x['سعر البيع'])>0).map(x=>[x['العربية'],x['الموديل'],x['سعر الشراء'],x['سعر البيع'],x['صافي الربح الحقيقي']]);
-  }else if(type==='stock'){
-    hs=['العربية','الموديل','سعر الشراء','حالة البيع'];
-    rows=A('العربيات').filter(x=>!sold(x)).map(x=>[x['العربية'],x['الموديل'],x['سعر الشراء'],x['حالة البيع']]);
-  }else if(type==='customers'){
-    hs=['التاريخ','العميل','الهاتف','العربية المطلوبة','الموديل','الحالة','مطابقة'];
-    rows=A('طلبات العملاء').map(x=>[x['التاريخ'],x['اسم العميل'],x['رقم التليفون'],x['السيارة المطلوبة'],x['الموديل'],x['الحالة'],match(x).length]);
-  }else if(type==='partners'){
-    hs=['الشريك','رأس المال الحالي','موزع','غير موزع','الأرباح','الإضافات','السحوبات','الرصيد النهائي'];
-    rows=A('الشركاء').map(p=>{const st=partnerStats(p);return [st.name,st.capital,st.invested,st.undistributed,st.profit,st.deposits,st.withdrawals,st.finalBalance]});
-  }else if(type==='cash'){
-    hs=h('حركة الخزنة'); rows=A('حركة الخزنة').map(x=>hs.map(k=>x[k]));
-  }else if(type==='employees'){
-    hs=h('الموظفين'); rows=A('الموظفين').map(x=>hs.map(k=>x[k]));
-  }else if(type==='employee_tx'){
-    hs=h('حركة الموظفين'); rows=A('حركة الموظفين').map(x=>hs.map(k=>x[k]));
-  }
-  const moneyCols=new Set(['سعر الشراء','سعر البيع','صافي الربح الحقيقي','رأس المال الحالي','موزع','غير موزع','الأرباح','الإضافات','السحوبات','الرصيد النهائي','المبلغ','الراتب الشهري']);
-  out.innerHTML='<div class="tablewrap"><table class="table"><thead><tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map((v,i)=>`<td>${moneyCols.has(hs[i])&&typeof v!=='string'?money(v):esc(v)}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>' || '<div class="empty">لا توجد بيانات</div>';
-  if(!rows.length)out.innerHTML='<div class="empty">لا توجد بيانات في التقرير</div>';
 }
 function renderPartnerDetailReport(){
   const out=document.getElementById('reportOutput'); if(!out)return;
@@ -759,6 +699,69 @@ window.addEventListener('resize', function(){
 });
 </script>
 
+
+<script id="tn-report-print-js">
+function renderReport(type){
+  const out=document.getElementById('reportOutput'); if(!out)return;
+  const titles={sales:'تقرير المبيعات',stock:'تقرير المخزون',customers:'تقرير العملاء',partners:'تقرير الشركاء',cash:'تقرير الخزنة',employees:'تقرير الموظفين',employee_tx:'تقرير حركة الموظفين'};
+  out.dataset.reportTitle=titles[type]||'تقرير TN Auto';
+  let hs=[],rows=[];
+  if(type==='sales'){
+    hs=['العربية','الموديل','سعر الشراء','سعر البيع','صافي الربح الحقيقي'];
+    rows=A('العربيات').filter(x=>Number(x['سعر البيع'])>0).map(x=>[x['العربية'],x['الموديل'],x['سعر الشراء'],x['سعر البيع'],x['صافي الربح الحقيقي']]);
+  }else if(type==='stock'){
+    hs=['العربية','الموديل','سعر الشراء','حالة البيع'];
+    rows=A('العربيات').filter(x=>!sold(x)).map(x=>[x['العربية'],x['الموديل'],x['سعر الشراء'],x['حالة البيع']]);
+  }else if(type==='customers'){
+    hs=['التاريخ','العميل','الهاتف','العربية المطلوبة','الموديل','الحالة','مطابقة'];
+    rows=A('طلبات العملاء').map(x=>[x['التاريخ'],x['اسم العميل'],x['رقم التليفون'],x['السيارة المطلوبة'],x['الموديل'],x['الحالة'],match(x).length]);
+  }else if(type==='partners'){
+    hs=['الشريك','رأس المال الحالي','موزع','غير موزع','الأرباح','الإضافات','السحوبات','الرصيد النهائي'];
+    rows=A('الشركاء').map(p=>{const st=partnerStats(p);return [st.name,st.capital,st.invested,st.undistributed,st.profit,st.deposits,st.withdrawals,st.finalBalance]});
+  }else if(type==='cash'){
+    hs=h('حركة الخزنة'); rows=A('حركة الخزنة').map(x=>hs.map(k=>x[k]));
+  }else if(type==='employees'){
+    hs=h('الموظفين'); rows=A('الموظفين').map(x=>hs.map(k=>x[k]));
+  }else if(type==='employee_tx'){
+    hs=h('حركة الموظفين'); rows=A('حركة الموظفين').map(x=>hs.map(k=>x[k]));
+  }
+  const moneyCols=new Set(['سعر الشراء','سعر البيع','صافي الربح الحقيقي','رأس المال الحالي','موزع','غير موزع','الأرباح','الإضافات','السحوبات','الرصيد النهائي','المبلغ','الراتب الشهري']);
+  let html='<div class="tablewrap"><table class="table"><thead><tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'</tr></thead><tbody>';
+  html+=rows.map(r=>'<tr>'+r.map((v,i)=>`<td>${moneyCols.has(hs[i])&&typeof v!=='string'?money(v):esc(v??'')}</td>`).join('')+'</tr>').join('');
+  html+='</tbody></table></div>';
+  out.innerHTML=rows.length?html:'<div class="empty">لا توجد بيانات في التقرير</div>';
+}
+function printCurrentReport(){
+  const report=document.getElementById('reportOutput');
+  if(!report){alert('لا يوجد تقرير للطباعة');return;}
+  let root=document.getElementById('tn-print-root');
+  if(root) root.remove();
+  root=document.createElement('div'); root.id='tn-print-root';
+  const clone=report.cloneNode(true);
+  clone.querySelectorAll('.toolbar,.btn,.report-print-controls,.footer,.page-footer,.app-footer,.generated-by,.system-footer').forEach(el=>el.remove());
+  const detail=clone.querySelector('#partnerDetailBody');
+  if(detail) clone.innerHTML=detail.innerHTML;
+  const selected=document.getElementById('partnerDetailSelect');
+  const title=selected ? ('كشف شريك تفصيلي - '+(selected.options[selected.selectedIndex]?.text||'')) : (report.dataset.reportTitle||'تقرير TN Auto');
+  root.innerHTML=`<div class="tn-print-sheet">
+    <div class="tn-print-header">
+      <img src="tn-auto-print-logo.jpg" alt="EL TAWFIK TN AUTO">
+      <div class="company">EL TAWFIK TN AUTO</div>
+      <div class="title">${esc(title)}</div>
+      <div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('en-GB')}</div>
+    </div>
+    <div class="tn-print-body">${clone.innerHTML}</div>
+    <div class="tn-print-footer">
+      <div><img src="tn-auto-print-logo.jpg" alt="EL TAWFIK TN AUTO"><div class="company">EL TAWFIK TN AUTO</div></div>
+      <div class="contact">TN Auto System</div>
+    </div>
+  </div>`;
+  document.body.appendChild(root);
+  const cleanup=()=>{root.remove();window.removeEventListener('afterprint',cleanup)};
+  window.addEventListener('afterprint',cleanup);
+  setTimeout(()=>window.print(),150);
+}
+</script>
 </body></html>
 <script>
 window.addEventListener('DOMContentLoaded',async()=>{
