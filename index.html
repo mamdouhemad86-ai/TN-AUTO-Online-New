@@ -580,7 +580,13 @@ function showPartnerDetail(index){
   html+='</tbody></table></div></div>';
   html+=`<div class="note" style="margin-top:14px">المسحوبات المسجلة: <b>${money(st.withdrawals)}</b> — تم خصمها من رصيد الشريك فقط، ولا يتم خصمها مرة ثانية من كاش الخزنة عند عرض التقرير.</div>`;
   html+='<div class="panel" style="margin-top:14px"><h3>حركة الشريك</h3><div class="tablewrap"><table class="table"><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>';
-  html+=st.mv.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${esc(x['البيان']||'')}</td><td>${money(x['المبلغ'])}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">لا توجد حركة مسجلة</td></tr>';
+  const withdrawalRows=st.mv.filter(x=>String(x['نوع الحركة']||'')==='سحب').reduce((n,x)=>n+(Number(x['المبلغ'])||0),0);
+  const inferredWithdrawal=Math.max(0,st.withdrawals-withdrawalRows);
+  let movementRows=st.mv.slice();
+  if(inferredWithdrawal>0){
+    movementRows.push({'التاريخ':'—','نوع الحركة':'سحب سابق','البيان':'فرق رأس المال الأساسي عن الرصيد الحالي (للتوضيح فقط — لا يخصم من الخزنة مرة أخرى)','المبلغ':inferredWithdrawal});
+  }
+  html+=movementRows.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${esc(x['البيان']||'')}</td><td>${money(x['المبلغ'])}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">لا توجد حركة مسجلة</td></tr>';
   html+='</tbody></table></div></div>';
   body.innerHTML=html;
 }
