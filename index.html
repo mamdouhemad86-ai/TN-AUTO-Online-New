@@ -643,6 +643,7 @@ function rebuildCarContributions(){
  S['مساهمات العربيات']=out;
 }
 async function saveModal(){
+ const isNew = ctx.index == null;
  let obj={};fields[ctx.type].forEach(([l])=>obj[l]=document.getElementById('f_'+l).value);
  if(ctx.type==='car'){
  obj['دفع من الخزنة?']=document.getElementById('f_دفع_من_الخزنة؟')?.value||'نعم';
@@ -696,15 +697,17 @@ async function saveModal(){
    }
  }
  if(ctx.type==='car'){ rebuildCarContributions(); }
- if(ctx.type==='request' && onlineMode && isNew){
-   // حفظ طلب العميل مباشرة في Supabase بدل RPC القديم الذي كان يفشل.
+ if(ctx.type==='request' && onlineMode){
+   // طلبات العملاء هي مصدر التنبيهات؛ نحفظها مباشرة في Supabase في الإضافة والتعديل.
    try{
      const name=obj['اسم العميل']||null, phone=obj['رقم التليفون']||null;
-     let customerId=null;
+     let customerId=window.__requestCustomerMap?.[String(obj.id)] ?? null;
+     const snap=(window.__cloudSnapshot?.requests||[]).find(x=>Number(x.id)===Number(obj.id));
+     customerId=customerId ?? snap?.customer_id ?? null;
      if(phone){
        const {data:existing,error:findErr}=await sb.from('customers').select('id').eq('phone',phone).limit(1).maybeSingle();
        if(findErr) throw findErr;
-       customerId=existing?.id||null;
+       if(existing?.id) customerId=existing.id;
      }
      if(!customerId){
        const {data:maxRows,error:maxErr}=await sb.from('customers').select('id').order('id',{ascending:false}).limit(1);
@@ -712,35 +715,37 @@ async function saveModal(){
        customerId=(Number(maxRows?.[0]?.id)||0)+1;
        const {error:customerErr}=await sb.from('customers').insert({id:customerId,name:name||'عميل',phone:phone,whatsapp:phone,notes:obj['ملاحظات']||null});
        if(customerErr) throw customerErr;
+     }else{
+       const {error:customerErr}=await sb.from('customers').update({name:name||'عميل',phone:phone,whatsapp:phone,notes:obj['ملاحظات']||null,updated_at:new Date().toISOString()}).eq('id',customerId);
+       if(customerErr) throw customerErr;
      }
-     const {data:reqMaxRows,error:reqMaxErr}=await sb.from('vehicle_requests').select('id').order('id',{ascending:false}).limit(1);
-     if(reqMaxErr) throw reqMaxErr;
-     const requestId=(Number(reqMaxRows?.[0]?.id)||0)+1;
+     if(!obj.id) obj.id=nextLocalId('طلبات العملاء');
+     const requestId=Number(obj.id);
      const row={
        id:requestId,customer_id:customerId,customer_name:name,customer_phone:phone,
        request_date:obj['التاريخ']||new Date().toISOString().slice(0,10),
-       desired_make:obj['السيارة المطلوبة']||null,desired_model:obj['الموديل']||null,
+       desired_make:obj['السيارة المطلوبة']||null,desired_model:obj['الموديل']?String(obj['الموديل']):null,
        desired_year_from:Number(obj['السنة من'])||null,desired_year_to:Number(obj['السنة إلى'])||null,
        budget_min:Number(obj['الميزانية من'])||Number(obj['الميزانية'])||0,
        budget_max:Number(obj['الميزانية إلى'])||Number(obj['الميزانية'])||0,
        payment_method:obj['كاش/تقسيط']||null,down_payment:Number(obj['المقدم'])||0,
        color:obj['اللون']||null,notes:obj['ملاحظات']||null,status:toDbRequestStatus(obj['الحالة']),responsible:obj['مسؤول الطلب']||null
      };
-     const {error:reqErr}=await sb.from('vehicle_requests').insert(row);
+     const {error:reqErr}=await sb.from('vehicle_requests').upsert(row,{onConflict:'id'});
      if(reqErr) throw reqErr;
      obj.id=requestId;
      window.__requestCustomerMap=window.__requestCustomerMap||{};
      window.__requestCustomerMap[String(requestId)]=customerId;
-     localStorage.setItem(KEY,JSON.stringify(S));
-     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
+     window.__cloudSnapshot={...(window.__cloudSnapshot||{}),requests:[...(window.__cloudSnapshot?.requests||[]).filter(x=>Number(x.id)!==requestId),row]};
+     save(false);
      closeModal();renderAll();
-     alert('تم حفظ طلب العميل أونلاين بنجاح.');
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل والتنبيهات أونلاين';
+     alert(isNew?'تم حفظ طلب العميل في السحابة بنجاح.':'تم تعديل طلب العميل في السحابة بنجاح.');
      return;
    }catch(error){
-     console.error('Direct customer request save error',error);
-     localStorage.setItem(KEY,JSON.stringify(S));
+     console.error('Cloud customer request save error',error);
      if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ طلب العميل أونلاين';
-     alert('لم يتم حفظ طلب العميل أونلاين.\n\n'+(error?.message||error));
+     alert('لم يتم حفظ طلب العميل في السحابة.\n\n'+(error?.message||error));
      return;
    }
  }
