@@ -327,7 +327,7 @@ function migrate(){
   save();
 }
 const P={dash:'لوحة التحكم',cars:'المخزون والعربيات',requests:'طلبات العملاء',partners:'الشركاء',contrib:'مساهمات العربيات',cash:'الخزنة',moves:'حركة الشركاء',refunds:'مبالغ تسترد',profits:'الأرباح',reports:'التقارير',employees:'الموظفين',original:'البيانات الأصلية'};
-function save(){localStorage.setItem(KEY,JSON.stringify(S));if(onlineMode) queueCloudSync()}
+function save(sync=true){localStorage.setItem(KEY,JSON.stringify(S));if(sync&&onlineMode) queueCloudSync()}
 function A(s){return Array.isArray(S[s])?S[s]:(S[s]=[])}
 migrate();
 function esc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}
@@ -451,7 +451,7 @@ function rebuildCarContributions(){
  }
  S['مساهمات العربيات']=out;
 }
-function saveModal(){
+async function saveModal(){
  let obj={};fields[ctx.type].forEach(([l])=>obj[l]=document.getElementById('f_'+l).value);
  if(ctx.type==='car'){
  obj['دفع من الخزنة?']=document.getElementById('f_دفع_من_الخزنة؟')?.value||'نعم';
@@ -497,6 +497,37 @@ function saveModal(){
    }
  }
  if(ctx.type==='car'){ rebuildCarContributions(); }
+ if(ctx.type==='request' && onlineMode && isNew){
+   const payload={
+     p_customer_name: obj['اسم العميل']||null,
+     p_phone: obj['رقم التليفون']||null,
+     p_whatsapp: obj['رقم التليفون']||null,
+     p_city: null,
+     p_customer_notes: obj['ملاحظات']||null,
+     p_desired_make: obj['السيارة المطلوبة']||null,
+     p_desired_model: obj['الموديل']||null,
+     p_desired_year_from: Number(obj['السنة من'])||null,
+     p_desired_year_to: Number(obj['السنة إلى'])||null,
+     p_budget_min: Number(obj['الميزانية من'])||Number(obj['الميزانية'])||0,
+     p_budget_max: Number(obj['الميزانية إلى'])||Number(obj['الميزانية'])||0,
+     p_color: obj['اللون']||null,
+     p_request_notes: obj['ملاحظات']||null,
+     p_status: obj['الحالة']||'جديد'
+   };
+   const {data,error}=await sb.rpc('save_vehicle_request',payload);
+   if(error){
+     localStorage.setItem(KEY,JSON.stringify(S));
+     console.error('save_vehicle_request RPC error',error);
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ طلب العميل أونلاين';
+     alert('تم تسجيل الطلب محلياً، لكن لم يتم حفظه أونلاين.\n\n'+(error.message||error));
+     closeModal();renderAll();return;
+   }
+   localStorage.setItem(KEY,JSON.stringify(S));
+   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
+   closeModal();renderAll();
+   alert('تم حفظ طلب العميل أونلاين بنجاح.');
+   return;
+ }
  save();closeModal();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ';
 }
 function edit(s,i){let map={'العربيات':'car','طلبات العملاء':'request','الشركاء':'partner','مساهمات العربيات':'contrib','حركة الشركاء':'move','مبالغ تسترد':'refund','الموظفين':'employee','حركة الموظفين':'employee_tx'};modal(map[s],A(s)[i],i,s)}
