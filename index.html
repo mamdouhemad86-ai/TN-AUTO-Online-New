@@ -46,34 +46,21 @@ async function cloudSelect(table){
   return data||[];
 }
 async function cloudReplace(table, rows){
-  if(!onlineMode) return;
+  if(!onlineMode)return;
   const clean=cleanRowsFor(table,rows||[]);
-  // Sync without deleting everything first. This prevents a temporary
-  // network/validation error from wiping the cloud table.
+  // Fast sync: one bulk upsert + at most one bulk delete.
   if(clean.length){
     const {error:e}=await sb.from(table).upsert(clean,{onConflict:'id'});
     if(e) throw e;
-  }
-  const ids=clean.map(r=>r.id).filter(v=>v!==undefined&&v!==null);
-  if(ids.length){
-    const {data:existing,error:q}=await sb.from(table).select('id');
-    if(q) throw q;
-    const keep=new Set(ids.map(String));
-    const stale=(existing||[]).map(r=>r.id).filter(id=>!keep.has(String(id)));
-    for(const id of stale){ const {error:d}=await sb.from(table).delete().eq('id',id); if(d) throw d; }
+    const ids=clean.map(r=>Number(r.id)).filter(Number.isFinite);
+    if(ids.length){
+      const {error:d}=await sb.from(table).delete().not('id','in',`(${ids.join(',')})`);
+      if(d) throw d;
+    }
   }else{
     const {error:d}=await sb.from(table).delete().neq('id',0);
     if(d) throw d;
   }
-}
-function toDbRequestStatus(status){
-  const m={'جديد':'open','تم التواصل':'searching','بانتظار عربية':'searching','تم توفير عربية':'found','تم البيع':'closed','مغلق':'closed','ملغي':'cancelled','ملغى':'cancelled'};
-  const v=String(status||'open').trim();
-  return m[v] || (['open','searching','found','closed','cancelled'].includes(v)?v:'open');
-}
-function toUiRequestStatus(status){
-  const m={'open':'جديد','searching':'تم التواصل','found':'تم توفير عربية','closed':'مغلق','cancelled':'ملغي'};
-  return m[String(status||'open')] || 'جديد';
 }
 
 function applyCloudSnapshot(s){
@@ -698,8 +685,10 @@ async function saveModal(){
  }
  if(ctx.type==='car'){ rebuildCarContributions(); }
  if(ctx.type==='request' && onlineMode){
-   // طلبات العملاء هي مصدر التنبيهات؛ نحفظها مباشرة في Supabase في الإضافة والتعديل.
-   try{
+   // طلبات العملاء: الحفظ محلياً وإغلاق النافذة فوراً، ثم المزامنة في الخلفية.
+   save(false); closeModal(); renderAll();
+   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ محلياً — جاري المزامنة...';
+   (async()=>{ try{
      const name=obj['اسم العميل']||null, phone=obj['رقم التليفون']||null;
      let customerId=window.__requestCustomerMap?.[String(obj.id)] ?? null;
      const snap=(window.__cloudSnapshot?.requests||[]).find(x=>Number(x.id)===Number(obj.id));
@@ -738,16 +727,13 @@ async function saveModal(){
      window.__requestCustomerMap[String(requestId)]=customerId;
      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),requests:[...(window.__cloudSnapshot?.requests||[]).filter(x=>Number(x.id)!==requestId),row]};
      save(false);
-     closeModal();renderAll();
-     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل والتنبيهات أونلاين';
-     alert(isNew?'تم حفظ طلب العميل في السحابة بنجاح.':'تم تعديل طلب العميل في السحابة بنجاح.');
-     return;
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
    }catch(error){
      console.error('Cloud customer request save error',error);
-     if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ طلب العميل أونلاين';
-     alert('لم يتم حفظ طلب العميل في السحابة.\n\n'+(error?.message||error));
-     return;
-   }
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ محلياً — تعذر المزامنة';
+     queueCloudSync();
+   }})();
+   return;
  }
  save();closeModal();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ';
 }
