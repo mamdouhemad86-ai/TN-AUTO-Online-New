@@ -140,6 +140,9 @@ async function syncFromCloud(showAlert=true){
 
 <script>
 let cloudSyncTimer=null;
+window.__pendingRequestSaves=window.__pendingRequestSaves||{};
+try{Object.assign(window.__pendingRequestSaves,JSON.parse(localStorage.getItem('TN_AUTO_PENDING_REQUESTS')||'{}'));}catch(e){}
+function persistPendingRequests(){localStorage.setItem('TN_AUTO_PENDING_REQUESTS',JSON.stringify(window.__pendingRequestSaves||{}));}
 function queueCloudSync(){
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer=setTimeout(()=>syncLocalToCloud().catch(e=>{
@@ -713,6 +716,7 @@ async function saveModal(){
    const requestId=Number(obj.id);
    window.__pendingRequestSaves=window.__pendingRequestSaves||{};
    window.__pendingRequestSaves[String(requestId)]=obj;
+   persistPendingRequests();
    (async()=>{
      try{
        const name=String(obj['اسم العميل']||'').trim();
@@ -733,11 +737,9 @@ async function saveModal(){
          const {error:e}=await sb.from('customers').update({name,phone,whatsapp:phone,notes:obj['ملاحظات']||null,updated_at:new Date().toISOString()}).eq('id',customerId);
          if(e) throw e;
        }else{
-         const {data:maxRows,error:maxErr}=await sb.from('customers').select('id').order('id',{ascending:false}).limit(1);
-         if(maxErr) throw maxErr;
-         customerId=(Number(maxRows?.[0]?.id)||0)+1;
-         const {error:e}=await sb.from('customers').insert({id:customerId,name,phone,whatsapp:phone,notes:obj['ملاحظات']||null});
+         const {data:created,error:e}=await sb.from('customers').insert({name,phone,whatsapp:phone,notes:obj['ملاحظات']||null}).select('id').single();
          if(e) throw e;
+         customerId=Number(created.id);
        }
 
        const row={
@@ -758,11 +760,13 @@ async function saveModal(){
        window.__requestCustomerMap[String(requestId)]=customerId;
        window.__cloudSnapshot={...(window.__cloudSnapshot||{}),requests:[...(window.__cloudSnapshot?.requests||[]).filter(x=>Number(x.id)!==requestId),row]};
        delete window.__pendingRequestSaves[String(requestId)];
+       persistPendingRequests();
        save(false); renderAll();
        if(typeof sysStatus!=='undefined') sysStatus.textContent='تم حفظ طلب العميل في السحابة ✓';
      }catch(error){
        console.error('Cloud customer request save error',error);
-       if(typeof sysStatus!=='undefined') sysStatus.textContent='الطلب محفوظ محلياً — تعذر رفعه للسحابة';
+       persistPendingRequests();
+       if(typeof sysStatus!=='undefined') sysStatus.textContent='الطلب محفوظ محلياً — جاري إعادة المحاولة عند المزامنة';
        alert('تم حفظ الطلب على الجهاز، لكن لم يتم رفعه للسحابة.\n\n'+(error.message||error));
      }
    })();
@@ -920,8 +924,7 @@ window.addEventListener('resize', function(){
 window.addEventListener('DOMContentLoaded',async()=>{
   initOnline();
   if(onlineMode){
-    const loaded=await syncFromCloud(false);
-    if(!loaded && Object.values(S).some(v=>Array.isArray(v)&&v.length)) await syncLocalToCloud();
+    await syncFromCloud(false);
   }
   renderAll();
 });
