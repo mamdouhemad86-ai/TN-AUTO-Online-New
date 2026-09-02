@@ -920,11 +920,15 @@ window.addEventListener('resize', function(){
 </body></html>
 <script>
 window.addEventListener('DOMContentLoaded',async()=>{
+  // افتح الاتصال أولاً ثم اجعل Supabase هو المصدر الأساسي عند بدء التشغيل.
+  // مهم: لا نعمل أي local -> cloud sync تلقائي عند فتح جهاز جديد.
   initOnline();
   if(onlineMode){
-    // عند فتح أي جهاز: السحابة هي المصدر الأساسي للطلبات والبيانات.
-    // لا ننفذ مزامنة محلية شاملة تلقائياً حتى لا نكتب فوق بيانات السحابة.
-    await syncFromCloud(false);
+    try{
+      await syncFromCloud(false);
+    }catch(e){
+      console.error('Initial cloud sync failed',e);
+    }
   }
   renderAll();
 });
