@@ -39,6 +39,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">function realCashBalance(){const capital=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0)+A('حركة الشركاء').reduce((s,x)=>{const t=String(x['نوع الحركة']);return s+(t==='إضافة'?(Number(x['المبلغ'])||0):(t==='سحب'?-(Number(x['المبلغ'])||0):0));},0);const carsValue=A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0);const outstanding=A('المبالغ المستردة').reduce((s,x)=>s+(Number(x['المبلغ'])||0)-(Number(x['المسترد'])||0),0);return capital-carsValue-outstanding;}</script>
 
 <script>
+// Request status mapping between the Arabic UI and Supabase values.
+// Supabase currently stores request status as: open / contacted / waiting_car / car_found / sold / closed.
+function toUiRequestStatus(status){
+  const m={open:'جديد',contacted:'تم التواصل',waiting_car:'بانتظار عربية',car_found:'تم توفير عربية',sold:'تم البيع',closed:'مغلق'};
+  return m[String(status||'').toLowerCase()] || (status || 'جديد');
+}
+function toDbRequestStatus(status){
+  const m={'جديد':'open','تم التواصل':'contacted','بانتظار عربية':'waiting_car','تم توفير عربية':'car_found','تم البيع':'sold','مغلق':'closed'};
+  const v=String(status||'').trim();
+  return m[v] || (['open','contacted','waiting_car','car_found','sold','closed'].includes(v)?v:'open');
+}
+
 async function cloudSelect(table){
   if(!onlineMode) return null;
   const {data,error}=await sb.from(table).select('*');
