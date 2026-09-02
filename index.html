@@ -759,7 +759,7 @@ async function saveModal(){
      window.__requestCustomerMap=window.__requestCustomerMap||{};
      window.__requestCustomerMap[String(requestId)]=customerId;
      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),requests:[...(window.__cloudSnapshot?.requests||[]).filter(x=>Number(x.id)!==requestId),row]};
-     if(window.__pendingRequestSaves) delete window.__pendingRequestSaves[String(requestId)];
+     if(window.__pendingRequestSaves) { delete window.__pendingRequestSaves[String(requestId)]; persistPendingRequests(); }
      save(false);
      renderAll();
      if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
@@ -922,8 +922,9 @@ window.addEventListener('resize', function(){
 window.addEventListener('DOMContentLoaded',async()=>{
   initOnline();
   if(onlineMode){
-    const loaded=await syncFromCloud(false);
-    if(!loaded && Object.values(S).some(v=>Array.isArray(v)&&v.length)) await syncLocalToCloud();
+    // عند فتح أي جهاز: السحابة هي المصدر الأساسي للطلبات والبيانات.
+    // لا ننفذ مزامنة محلية شاملة تلقائياً حتى لا نكتب فوق بيانات السحابة.
+    await syncFromCloud(false);
   }
   renderAll();
 });
