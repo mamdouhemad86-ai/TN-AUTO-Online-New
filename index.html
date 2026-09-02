@@ -1,4 +1,4 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png"><link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest">
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png"><link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0b0b0b"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="TN Auto">
 <title>TN Auto System</title><style>
 :root{--nav:#101828;--blue:#155eef;--bg:#f5f7fb;--card:#fff;--line:#e4e7ec;--muted:#667085;--ok:#12b76a;--warn:#f79009;--bad:#f04438}
 *{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:#172033}.side{position:fixed;right:0;top:0;bottom:0;width:255px;background:var(--nav);color:#fff;padding:18px 13px;overflow:auto}.brand{font-size:21px;font-weight:800;padding:8px 10px 20px}.nav button{width:100%;border:0;background:transparent;color:#d0d5dd;text-align:right;padding:11px 12px;border-radius:9px;margin:2px 0;cursor:pointer}.nav button:hover,.nav button.active{background:#1d2939;color:#fff}.group{font-size:11px;color:#98a2b3;margin:15px 10px 5px}.main{margin-right:255px;padding:22px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:4px 0;color:var(--muted);font-size:12px}.actions{display:flex;gap:7px}.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;cursor:pointer;font-weight:700}.primary{background:var(--blue);border-color:var(--blue);color:#fff}.danger{color:#b42318}.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}.label{font-size:12px;color:var(--muted)}.num{font-size:24px;font-weight:800;margin-top:7px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}.page.hidden{display:none}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.search{flex:1;min-width:250px;padding:9px;border:1px solid var(--line);border-radius:9px}.tablewrap{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:10px}.table{border-collapse:collapse;width:100%;font-size:12px}.table th,.table td{padding:9px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}.table th{background:#f8fafc;position:sticky;top:0}.tag{padding:4px 8px;border-radius:99px;font-size:11px;background:#eef4ff;color:#175cd3}.tag.ok{background:#ecfdf3;color:#067647}.tag.warn{background:#fffaeb;color:#b54708}.alert{padding:11px;border:1px solid #fedf89;background:#fffaeb;border-radius:10px;margin:7px 0}.alert.ok{background:#ecfdf3;border-color:#abefc6}.empty{text-align:center;color:var(--muted);padding:28px}.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:18px;z-index:20}.modal.hidden{display:none}.modalbox{background:#fff;border-radius:16px;padding:20px;width:min(1000px,100%);max-height:92vh;overflow:auto}.form{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}.field label{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.field input,.field select,.field textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px}.field textarea{min-height:70px}.span3{grid-column:1/-1}.span2{grid-column:span 2}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.footer{font-size:11px;color:var(--muted);margin-top:14px}
@@ -42,13 +42,13 @@
 // Request status mapping between the Arabic UI and Supabase values.
 // Supabase currently stores request status as: open / contacted / waiting_car / car_found / sold / closed.
 function toUiRequestStatus(status){
-  const m={open:'جديد',contacted:'تم التواصل',waiting_car:'بانتظار عربية',car_found:'تم توفير عربية',sold:'تم البيع',closed:'مغلق'};
+  const m={open:'جديد',searching:'بانتظار عربية',found:'تم توفير عربية',closed:'مغلق',cancelled:'مغلق'};
   return m[String(status||'').toLowerCase()] || (status || 'جديد');
 }
 function toDbRequestStatus(status){
-  const m={'جديد':'open','تم التواصل':'contacted','بانتظار عربية':'waiting_car','تم توفير عربية':'car_found','تم البيع':'sold','مغلق':'closed'};
+  const m={'جديد':'open','تم التواصل':'searching','بانتظار عربية':'searching','تم توفير عربية':'found','تم البيع':'closed','مغلق':'closed'};
   const v=String(status||'').trim();
-  return m[v] || (['open','contacted','waiting_car','car_found','sold','closed'].includes(v)?v:'open');
+  return m[v] || (['open','searching','found','closed','cancelled'].includes(v)?v:'open');
 }
 
 async function cloudSelect(table){
@@ -120,6 +120,16 @@ async function syncFromCloud(showAlert=true){
     if(Array.isArray(dashboard_settings) && dashboard_settings.length){ S.__dashboardRecoverableAmount=Number(dashboard_settings[0].recoverable_amount)||0; }
     window.__cloudSnapshot=snapshot;
     const loaded=applyCloudSnapshot(snapshot);
+    const pending=window.__pendingRequestSaves||{};
+    const pendingRows=Object.values(pending);
+    if(pendingRows.length){
+      const current=A('طلبات العملاء');
+      for(const pr of pendingRows){
+        const i=current.findIndex(x=>Number(x.id)===Number(pr.id));
+        if(i>=0) current[i]=pr; else current.push(pr);
+      }
+      localStorage.setItem(KEY,JSON.stringify(S));
+    }
     if(typeof sysStatus!=='undefined') sysStatus.textContent=loaded?'تم تحميل البيانات وحفظها':'متصل أونلاين';
     if(showAlert) alert(loaded?'تم تحميل البيانات المحفوظة من Supabase بنجاح.':'اتصل النظام بقاعدة البيانات ولم يجد بيانات بعد.');
     return loaded;
@@ -395,8 +405,10 @@ function initOnline(){
 <div class="footer">الكاش الحقيقي = رصيد الخزنة الدفتري − العجز المتبقي في «مبالغ تسترد». البيانات الجديدة محفوظة محلياً على نفس الجهاز. عند نشر النظام على GitHub Pages، نحتاج قاعدة بيانات أونلاين إذا أردت استخدامها من أكثر من جهاز.</div></main>
 
 <div id="modalbox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2 id="mt"></h2><button class="btn" onclick="closeModal()">إغلاق</button></div><div id="mf"></div></div></div>
-<div id="salebox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💰 بيع عربية</h2><button class="btn" onclick="closeSale()">إغلاق</button></div><div class="form"><div class="field span2"><label>العربية</label><select id="sc"></select></div><div class="field"><label>سعر البيع</label><input id="sp" type="number"></div><div class="field"><label>عمولة البيع</label><input id="scom" type="number" value="0">
-<div class="field"><label>مبلغ المعرض الفعلي (اختياري)</label><input id="showroomActualProfit" type="number" min="0" step="0.01" placeholder="الافتراضي حسب النسبة"></div></div><div class="field"><label>اسم المشتري</label><input id="sb"></div><div class="field"><label>رقم الهاتف</label><input id="sphone"></div><div class="field span3"><label>ملاحظات</label><textarea id="snotes"></textarea></div></div><br><button class="btn primary" onclick="saveSale()">حفظ البيع</button></div></div>
+<div id="salebox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💰 بيع عربية</h2><button class="btn" onclick="closeSale()">إغلاق</button></div><div class="form"><div class="field span2"><label>العربية</label><select id="sc"></select></div><div class="field"><label>سعر البيع</label><input id="sp" type="number"></div><div class="field"><label>عمولة البيع</label><input id="scom" type="number" value="0"></div>
+<div class="field"><label>نسبة المعرض</label><input id="showroomPct" type="number" min="0" max="100" step="0.01" value="33.33"></div>
+<div class="field"><label>نسبة الشركاء</label><input id="partnerPct" type="number" readonly value="66.67"></div>
+<div class="field span3"><div id="saleProfitPreview" class="note" style="margin-top:0">صافي الربح: 0 — المعرض: 0 (33.33%) — الشركاء: 0 (66.67%)</div></div><div class="field"><label>اسم المشتري</label><input id="sb"></div><div class="field"><label>رقم الهاتف</label><input id="sphone"></div><div class="field span3"><label>ملاحظات</label><textarea id="snotes"></textarea></div></div><br><button class="btn primary" onclick="saveSale()">حفظ البيع</button></div></div>
 <div id="wdBox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💸 سحب شريك</h2><button class="btn" onclick="closeWd()">إغلاق</button></div><div class="form"><div class="field"><label>الشريك</label><select id="wp"></select></div><div class="field"><label>التاريخ</label><input id="wd" type="date"></div><div class="field"><label>المبلغ</label><input id="wa" type="number"></div><div class="field span2"><label>البيان</label><input id="wst" value="سحب شريك"></div><div class="field"><label>ملاحظات</label><input id="wn"></div></div><br><button class="btn primary" onclick="saveWithdraw()">حفظ السحب</button></div></div>
 <div id="cashBox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💵 حركة خزنة</h2><button class="btn" onclick="closeCash()">إغلاق</button></div><div class="form"><div class="field"><label>التاريخ</label><input id="cd" type="date"></div><div class="field"><label>نوع الحركة</label><input id="ct"></div><div class="field"><label>العربية/البند</label><input id="ci"></div><div class="field"><label>المبلغ</label><input id="ca" type="number"></div><div class="field"><label>داخل</label><input id="cin" type="number" value="0"></div><div class="field"><label>خارج</label><input id="cout" type="number" value="0"></div><div class="field span3"><label>ملاحظات</label><textarea id="cn"></textarea></div></div><br><button class="btn primary" onclick="saveCash()">حفظ الحركة</button></div></div>
 
@@ -644,6 +656,7 @@ function rebuildCarContributions(){
 async function saveModal(){
  const isNew = ctx.index == null;
  let obj={};fields[ctx.type].forEach(([l])=>obj[l]=document.getElementById('f_'+l).value);
+ if(ctx.type==='request' && !obj.id){ obj.id=nextLocalId('طلبات العملاء'); }
  if(ctx.type==='car'){
  obj['دفع من الخزنة?']=document.getElementById('f_دفع_من_الخزنة؟')?.value||'نعم';
  const pcs=[...document.querySelectorAll('.pc')].map(x=>({name:x.dataset.partner,amount:Number(x.value)||0})).filter(x=>x.amount>0);
@@ -738,12 +751,14 @@ async function saveModal(){
      window.__requestCustomerMap=window.__requestCustomerMap||{};
      window.__requestCustomerMap[String(requestId)]=customerId;
      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),requests:[...(window.__cloudSnapshot?.requests||[]).filter(x=>Number(x.id)!==requestId),row]};
+     if(window.__pendingRequestSaves) delete window.__pendingRequestSaves[String(requestId)];
      save(false);
+     renderAll();
      if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
    }catch(error){
      console.error('Cloud customer request save error',error);
-     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ محلياً — تعذر المزامنة';
-     queueCloudSync();
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='تعذر حفظ طلب العميل أونلاين — الطلب محفوظ محلياً';
+     // يظل الطلب في قائمة معلقة، ومزامنة البيانات لن تستبدله أو تحذفه قبل نجاح الرفع.
    }})();
    return;
  }
@@ -809,8 +824,23 @@ async function del(s,i){
   let bal=0; for(const x of A('حركة الخزنة')){bal+=(Number(x['داخل'])||0)-(Number(x['خارج'])||0);x['الرصيد']=bal;}
   save();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحذف وتحديث الحسابات';
 }
-function saleModal(){let a=A('العربيات').map((c,i)=>({c,i})).filter(x=>!sold(x.c));sc.innerHTML=a.map(x=>`<option value="${x.i}">${esc(cname(x.c))} — ${esc(cmodel(x.c))} — شراء ${money(x.c['سعر الشراء'])}</option>`).join('')||'<option value="">لا توجد عربيات</option>';sp.value='';scom.value=0;sb.value='';sphone.value='';snotes.value='';salebox.classList.remove('hidden')}
+function updateSaleProfitPreview(){
+ const i=Number(sc.value), c=A('العربيات')[i], sell=Number(sp.value)||0, com=Number(scom.value)||0;
+ const purchase=(Number(c?.['سعر الشراء'])||0)+(Number(c?.['عمولة الشراء'])||0);
+ const profit=sell-purchase-com;
+ let pct=Number(showroomPct.value);
+ if(!Number.isFinite(pct)) pct=33.33;
+ pct=Math.max(0,Math.min(100,pct));
+ showroomPct.value=pct;
+ const partnerPctVal=100-pct;
+ partnerPct.value=partnerPctVal.toFixed(2);
+ const showroom=Math.max(0,profit)*pct/100;
+ const partners=Math.max(0,profit)-showroom;
+ saleProfitPreview.textContent=`صافي الربح: ${money(profit)} — المعرض: ${money(showroom)} (${pct.toFixed(2)}%) — الشركاء: ${money(partners)} (${partnerPctVal.toFixed(2)}%)`;
+}
+function saleModal(){let a=A('العربيات').map((c,i)=>({c,i})).filter(x=>!sold(x.c));sc.innerHTML=a.map(x=>`<option value="${x.i}">${esc(cname(x.c))} — ${esc(cmodel(x.c))} — شراء ${money(x.c['سعر الشراء'])}</option>`).join('')||'<option value="">لا توجد عربيات</option>';sp.value='';scom.value=0;showroomPct.value='33.33';partnerPct.value='66.67';sb.value='';sphone.value='';snotes.value='';salebox.classList.remove('hidden');updateSaleProfitPreview()}
 function closeSale(){salebox.classList.add('hidden')}
+['sc','sp','scom','showroomPct'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',updateSaleProfitPreview)});
 function distributeSaleProfit(c,p,showroomActual){
   const raw=String(c['مساهمات الشركاء']||'');
   const parts={}; raw.split('|').forEach(x=>{const m=x.trim().match(/^(.+?):\s*([\d.,]+)/);if(m)parts[m[1].trim()]=Number(m[2].replace(/,/g,''))||0});
@@ -836,7 +866,14 @@ function saveSale(){
  let i=Number(sc.value),c=A('العربيات')[i],sell=Number(sp.value)||0,com=Number(scom.value)||0;
  if(!c||!sell)return alert('اختار عربية واكتب سعر البيع');
  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);
- let p=sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com;c['صافي الربح الحقيقي']=p;c['ثلث المعرض']=p/3;c['ثلثان للشركاء']=p*2/3; distributeSaleProfit(c,p,(document.getElementById('showroomActualProfit')?.value===''?null:Number(document.getElementById('showroomActualProfit')?.value))); c['ملاحظات']=snotes.value;
+ let p=sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com;
+ let showroomPctValue=Number(document.getElementById('showroomPct')?.value);
+ if(!Number.isFinite(showroomPctValue)) showroomPctValue=33.33;
+ showroomPctValue=Math.max(0,Math.min(100,showroomPctValue));
+ const showroomActual=Math.max(0,p)*showroomPctValue/100;
+ const partnerPool=Math.max(0,p)-showroomActual;
+ c['صافي الربح الحقيقي']=p;c['ثلث المعرض']=showroomActual;c['ثلثان للشركاء']=partnerPool;c['نسبة المعرض']=showroomPctValue;c['نسبة الشركاء']=100-showroomPctValue;
+ distributeSaleProfit(c,p,showroomActual); c['ملاحظات']=snotes.value;
  const cash=A('حركة الخزنة'),oldBal=cashBalance();
  cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً'});
  save();closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع';alert('تم تسجيل البيع وتحديث المخزون والربح والخزنة');
