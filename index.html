@@ -40,7 +40,7 @@
 
 <script>
 // Request status mapping between the Arabic UI and Supabase values.
-// Supabase stores request status as: open / searching / found / closed / cancelled.
+// Supabase currently stores request status as: open / contacted / waiting_car / car_found / sold / closed.
 function toUiRequestStatus(status){
   const m={open:'جديد',searching:'بانتظار عربية',found:'تم توفير عربية',closed:'مغلق',cancelled:'مغلق'};
   return m[String(status||'').toLowerCase()] || (status || 'جديد');
@@ -140,9 +140,6 @@ async function syncFromCloud(showAlert=true){
 
 <script>
 let cloudSyncTimer=null;
-window.__pendingRequestSaves=window.__pendingRequestSaves||{};
-try{Object.assign(window.__pendingRequestSaves,JSON.parse(localStorage.getItem('TN_AUTO_PENDING_REQUESTS')||'{}'));}catch(e){}
-function persistPendingRequests(){localStorage.setItem('TN_AUTO_PENDING_REQUESTS',JSON.stringify(window.__pendingRequestSaves||{}));}
 function queueCloudSync(){
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer=setTimeout(()=>syncLocalToCloud().catch(e=>{
@@ -414,6 +411,11 @@ function initOnline(){
 
 <script>
 const INIT={"لوحة التحكم":[],"ملخص الخزنة":[],"الشركاء":[],"العربيات":[],"طلبات العملاء":[],"مبالغ تسترد":[],"مساهمات العربيات":[],"حركة الخزنة":[],"حركة الشركاء":[],"أرباح الشركاء":[],"ربح المعرض":[],"الموظفين":[],"حركة الموظفين":[]}, KEY='TN_AUTO_BLANK_V2'; let S=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(INIT);
+const PENDING_REQUESTS_KEY='TN_AUTO_PENDING_REQUESTS';
+window.__pendingRequestSaves=JSON.parse(localStorage.getItem(PENDING_REQUESTS_KEY)||'{}')||{};
+function persistPendingRequests(){localStorage.setItem(PENDING_REQUESTS_KEY,JSON.stringify(window.__pendingRequestSaves||{}));}
+for(const pr of Object.values(window.__pendingRequestSaves)){ if(pr&&pr.id!=null){ const rows=S['طلبات العملاء']||[]; const i=rows.findIndex(x=>Number(x.id)===Number(pr.id)); if(i>=0) rows[i]=pr; else rows.push(pr); S['طلبات العملاء']=rows; } }
+localStorage.setItem(KEY,JSON.stringify(S));
 function migrate(){
   const cash=A('حركة الخزنة');
   // Remove legacy placeholder rows with no real transaction data.
@@ -616,7 +618,7 @@ function renderPartners(){
 function renderAll(){renderDash();renderCars();renderRequests();renderPartners();table('مساهمات العربيات','ch','cb');table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderEmployees();renderOriginal();let __cap=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0),__stock=A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0),__cash=bookCashBalance(),__def=recoverableTotal();cashCurrent.textContent=money(__cash);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(__def);if(typeof cashReal!=='undefined')cashReal.textContent=money(__cash-__def)}
 const fields={
 car:[['العربية','text'],['الموديل','number'],['سعر الشراء','number'],['عمولة الشراء','number'],['دفع من الخزنة؟','select','نعم|لا'],['مصدر العربية / المورد','text'],['رقم المورد','text'],['اسم العميل المشتري','text'],['رقم تليفون العميل','text'],['حالة البيع','select','لم تُسجل بيانات البيع بعد|تم الحجز|مباعة'],['سعر البيع','number'],['عمولة البيع','number'],['صافي الربح الحقيقي','number'],['ثلث المعرض','number'],['ثلثان للشركاء','number'],['ملاحظات','textarea']],
-request:[['التاريخ','date'],['اسم العميل','text'],['رقم التليفون','text'],['السيارة المطلوبة','text'],['الموديل','number'],['السنة من','number'],['السنة إلى','number'],['الميزانية من','number'],['الميزانية إلى','number'],['كاش/تقسيط','select','كاش|تقسيط'],['المقدم','number'],['اللون','text'],['الحالة','select','جديد|تم التواصل|بانتظار عربية|تم توفير عربية|تم البيع|مغلق'],['مسؤول الطلب','text'],['ملاحظات','textarea']],
+request:[['التاريخ','date'],['اسم العميل','text'],['رقم التليفون','text'],['السيارة المطلوبة','text'],['الموديل','number'],['الميزانية','number'],['كاش/تقسيط','select','كاش|تقسيط'],['المقدم','number'],['اللون','text'],['الحالة','select','جديد|تم التواصل|بانتظار عربية|تم توفير عربية|تم البيع|مغلق'],['مسؤول الطلب','text'],['ملاحظات','textarea']],
 partner:[['الشريك','text'],['إجمالي المبلغ المسجل','number'],['الموزع على العربيات','number'],['غير موزع','number']],
 contrib:[['العربية','text'],['هبه','number'],['ممدوح','number'],['كريم','number'],['رامي','number'],['عمرو','number'],['شيرين','number'],['هيثم وعلي','number']],
 move:[['الشريك','text'],['التاريخ','date'],['نوع الحركة','text'],['البيان','text'],['المبلغ','number'],['ربح من العربيات','number'],['الإضافة الكلية','number'],['السحب الكلي','number'],['الرصيد','number']],
@@ -710,66 +712,62 @@ async function saveModal(){
  }
  if(ctx.type==='car'){ rebuildCarContributions(); }
  if(ctx.type==='request' && onlineMode){
-   // طلبات العملاء: حفظ محلي فوري + رفع مباشر للسحابة بدون مزامنة شاملة.
-   save(false); closeModal(); renderAll();
-   if(typeof sysStatus!=='undefined') sysStatus.textContent='تم حفظ الطلب — جاري رفعه للسحابة...';
-   const requestId=Number(obj.id);
-   window.__pendingRequestSaves=window.__pendingRequestSaves||{};
-   window.__pendingRequestSaves[String(requestId)]=obj;
+   // طلبات العملاء: ثبّت رقم الطلب واحفظه في قائمة معلقة قبل أي اتصال؛ حتى لا يختفي بعد refresh.
+   if(!obj.id) obj.id=nextLocalId('طلبات العملاء');
+   const localRows=A('طلبات العملاء');
+   const localIndex=localRows.findIndex(x=>Number(x.id)===Number(obj.id));
+   if(localIndex>=0) localRows[localIndex]=obj; else localRows.push(obj);
+   window.__pendingRequestSaves[String(obj.id)]=obj;
    persistPendingRequests();
-   (async()=>{
-     try{
-       const name=String(obj['اسم العميل']||'').trim();
-       const phone=String(obj['رقم التليفون']||'').trim();
-       if(!name){ throw new Error('اكتب اسم العميل'); }
-       if(!phone){ throw new Error('اكتب رقم التليفون'); }
-
-       let customerId=window.__requestCustomerMap?.[String(requestId)] ?? null;
-       if(!customerId){
-         const snap=(window.__cloudSnapshot?.requests||[]).find(x=>Number(x.id)===requestId);
-         customerId=snap?.customer_id ?? null;
-       }
+   save(false); closeModal(); renderAll();
+   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ محلياً — جاري المزامنة...';
+   (async()=>{ try{
+     const name=obj['اسم العميل']||null, phone=obj['رقم التليفون']||null;
+     let customerId=window.__requestCustomerMap?.[String(obj.id)] ?? null;
+     const snap=(window.__cloudSnapshot?.requests||[]).find(x=>Number(x.id)===Number(obj.id));
+     customerId=customerId ?? snap?.customer_id ?? null;
+     if(phone){
        const {data:existing,error:findErr}=await sb.from('customers').select('id').eq('phone',phone).limit(1).maybeSingle();
        if(findErr) throw findErr;
-       if(existing?.id) customerId=Number(existing.id);
-
-       if(customerId){
-         const {error:e}=await sb.from('customers').update({name,phone,whatsapp:phone,notes:obj['ملاحظات']||null,updated_at:new Date().toISOString()}).eq('id',customerId);
-         if(e) throw e;
-       }else{
-         const {data:created,error:e}=await sb.from('customers').insert({name,phone,whatsapp:phone,notes:obj['ملاحظات']||null}).select('id').single();
-         if(e) throw e;
-         customerId=Number(created.id);
-       }
-
-       const row={
-         id:requestId, customer_id:customerId, customer_name:name, customer_phone:phone,
-         request_date:obj['التاريخ']||new Date().toISOString().slice(0,10),
-         desired_make:obj['السيارة المطلوبة']||null, desired_model:obj['الموديل']?String(obj['الموديل']):null,
-         desired_year_from:Number(obj['السنة من'])||null, desired_year_to:Number(obj['السنة إلى'])||null,
-         budget_min:Number(obj['الميزانية من'])||Number(obj['الميزانية'])||0,
-         budget_max:Number(obj['الميزانية إلى'])||Number(obj['الميزانية'])||0,
-         payment_method:obj['كاش/تقسيط']||null, down_payment:Number(obj['المقدم'])||0,
-         color:obj['اللون']||null, notes:obj['ملاحظات']||null,
-         status:toDbRequestStatus(obj['الحالة']), responsible:obj['مسؤول الطلب']||null
-       };
-       const {error:reqErr}=await sb.from('vehicle_requests').upsert(row,{onConflict:'id'});
-       if(reqErr) throw reqErr;
-
-       window.__requestCustomerMap=window.__requestCustomerMap||{};
-       window.__requestCustomerMap[String(requestId)]=customerId;
-       window.__cloudSnapshot={...(window.__cloudSnapshot||{}),requests:[...(window.__cloudSnapshot?.requests||[]).filter(x=>Number(x.id)!==requestId),row]};
-       delete window.__pendingRequestSaves[String(requestId)];
-       persistPendingRequests();
-       save(false); renderAll();
-       if(typeof sysStatus!=='undefined') sysStatus.textContent='تم حفظ طلب العميل في السحابة ✓';
-     }catch(error){
-       console.error('Cloud customer request save error',error);
-       persistPendingRequests();
-       if(typeof sysStatus!=='undefined') sysStatus.textContent='الطلب محفوظ محلياً — جاري إعادة المحاولة عند المزامنة';
-       alert('تم حفظ الطلب على الجهاز، لكن لم يتم رفعه للسحابة.\n\n'+(error.message||error));
+       if(existing?.id) customerId=existing.id;
      }
-   })();
+     if(!customerId){
+       const {data:maxRows,error:maxErr}=await sb.from('customers').select('id').order('id',{ascending:false}).limit(1);
+       if(maxErr) throw maxErr;
+       customerId=(Number(maxRows?.[0]?.id)||0)+1;
+       const {error:customerErr}=await sb.from('customers').insert({id:customerId,name:name||'عميل',phone:phone,whatsapp:phone,notes:obj['ملاحظات']||null});
+       if(customerErr) throw customerErr;
+     }else{
+       const {error:customerErr}=await sb.from('customers').update({name:name||'عميل',phone:phone,whatsapp:phone,notes:obj['ملاحظات']||null,updated_at:new Date().toISOString()}).eq('id',customerId);
+       if(customerErr) throw customerErr;
+     }
+     if(!obj.id) obj.id=nextLocalId('طلبات العملاء');
+     const requestId=Number(obj.id);
+     const row={
+       id:requestId,customer_id:customerId,customer_name:name,customer_phone:phone,
+       request_date:obj['التاريخ']||new Date().toISOString().slice(0,10),
+       desired_make:obj['السيارة المطلوبة']||null,desired_model:obj['الموديل']?String(obj['الموديل']):null,
+       desired_year_from:Number(obj['السنة من'])||null,desired_year_to:Number(obj['السنة إلى'])||null,
+       budget_min:Number(obj['الميزانية من'])||Number(obj['الميزانية'])||0,
+       budget_max:Number(obj['الميزانية إلى'])||Number(obj['الميزانية'])||0,
+       payment_method:obj['كاش/تقسيط']||null,down_payment:Number(obj['المقدم'])||0,
+       color:obj['اللون']||null,notes:obj['ملاحظات']||null,status:toDbRequestStatus(obj['الحالة']),responsible:obj['مسؤول الطلب']||null
+     };
+     const {error:reqErr}=await sb.from('vehicle_requests').upsert(row,{onConflict:'id'});
+     if(reqErr) throw reqErr;
+     obj.id=requestId;
+     window.__requestCustomerMap=window.__requestCustomerMap||{};
+     window.__requestCustomerMap[String(requestId)]=customerId;
+     window.__cloudSnapshot={...(window.__cloudSnapshot||{}),requests:[...(window.__cloudSnapshot?.requests||[]).filter(x=>Number(x.id)!==requestId),row]};
+     if(window.__pendingRequestSaves) delete window.__pendingRequestSaves[String(requestId)];
+     save(false);
+     renderAll();
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ طلب العميل أونلاين';
+   }catch(error){
+     console.error('Cloud customer request save error',error);
+     if(typeof sysStatus!=='undefined')sysStatus.textContent='تعذر حفظ طلب العميل أونلاين — الطلب محفوظ محلياً';
+     // يظل الطلب في قائمة معلقة، ومزامنة البيانات لن تستبدله أو تحذفه قبل نجاح الرفع.
+   }})();
    return;
  }
  save();closeModal();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ';
@@ -924,7 +922,8 @@ window.addEventListener('resize', function(){
 window.addEventListener('DOMContentLoaded',async()=>{
   initOnline();
   if(onlineMode){
-    await syncFromCloud(false);
+    const loaded=await syncFromCloud(false);
+    if(!loaded && Object.values(S).some(v=>Array.isArray(v)&&v.length)) await syncLocalToCloud();
   }
   renderAll();
 });
