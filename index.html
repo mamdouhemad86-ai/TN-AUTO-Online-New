@@ -535,7 +535,8 @@ function partnerStats(p){
   // المسحوبات تُحسب من الفرق بين رأس المال الأساسي والرصيد الحالي.
   // عرضها في التقرير لا ينقص الكاش مرة أخرى؛ حركة الخزنة هي التي تسجل الدفع الفعلي.
   const ledgerWithdrawals=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?(Number(x['المبلغ'])||0):0),0);
-  const withdrawals=Math.max(0,baseCapital-capital,ledgerWithdrawals);
+  const inferredWithdrawals=Math.max(0,baseCapital-capital-profit);
+  const withdrawals=Math.max(inferredWithdrawals,ledgerWithdrawals);
   const undistributed=Math.max(0,capital-invested);
   const finalBalance=capital+profit;
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
@@ -664,7 +665,7 @@ function renderPartners(){
 function renderActiveContribTable(){
   const sheet='مساهمات العربيات', head='ch', body='cb';
   const hs=h(sheet), q='';
-  const activeCarIds=new Set(A('العربيات').filter(c=>String(c['حالة البيع']||'')!=='مباعة').map(c=>String(c.id)));
+  const activeCarIds=new Set(A('العربيات').filter(c=>!sold(c)).map(c=>String(c.id)));
   const all=A(sheet);
   const rs=all.map((r,i)=>({r,i})).filter(x=>activeCarIds.has(String(x.r.car_id||'')) && (!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q))));
   document.getElementById(head).innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>إجراء</th></tr>';
