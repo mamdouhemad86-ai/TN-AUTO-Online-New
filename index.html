@@ -490,11 +490,23 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset
 function table(sheet,head,body,search=''){let hs=h(sheet), q=search.toLowerCase(),all=A(sheet),rs=all.map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q)));document.getElementById(head).innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>إجراء</th></tr>';document.getElementById(body).innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td><button class="btn" onclick="edit('${sheet}',${i})">تعديل</button> <button class="btn danger" onclick="del('${sheet}',${i})">حذف</button></td></tr>`).join('')||`<tr><td colspan="${hs.length+1}" class="empty">لا توجد بيانات</td></tr>`}
 function cashBalance(){return A('حركة الخزنة').reduce((bal,x)=>bal+(Number(x['داخل'])||0)-(Number(x['خارج'])||0),0)}
 function recoverableTotal(){return A('مبالغ تسترد').reduce((sum,r)=>{const amount=Math.max(0,Number(r['المبلغ'])||0);const recovered=Math.min(amount,Math.max(0,Number(r['تم استرداده'])||0));r['المتبقي']=Math.max(0,amount-recovered);return sum+r['المتبقي'];},0)}
-function bookCashBalance(){return cashBalance();}
+function partnerFundsBalance(){return A('الشركاء').reduce((s,x)=>s+partnerStats(x).finalBalance,0)}
+function inventoryCashValue(){return A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0)}
+function manualCashNet(){
+ const excludedTypes=new Set(['الرصيد الافتتاحي المعتمد من لوحة التحكم','إضافة شريك','إضافة رأس مال شريك','سحب شريك','بيع عربية','شراء عربية','إرجاع بيع عربية','سحب ربح المعرض','إيداع كاش من المعرض']);
+ const excludedMarkers=['[AUTO-PARTNER]','[AUTO-SALE]','[AUTO-PURCHASE]','[SALE-REVERSAL]','[SHOWROOM-PROFIT-WITHDRAWAL]','[SHOWROOM-CASH-DEPOSIT]'];
+ return A('حركة الخزنة').reduce((s,x)=>{const type=String(x['نوع الحركة']||''),note=String(x['ملاحظات']||'');if(excludedTypes.has(type)||excludedMarkers.some(m=>note.includes(m)))return s;return s+(Number(x['داخل'])||0)-(Number(x['خارج'])||0);},0);
+}
+function showroomCashBalance(){return showroomProfitTotals().remaining}
+function bookCashBalance(){return partnerFundsBalance()-inventoryCashValue()+showroomCashBalance()+manualCashNet()}
+function financialCashBalances(){
+ const book=bookCashBalance(), deficit=recoverableTotal();
+ return {book,real:book-deficit};
+}
 function renderDash(){let cars=A('العربيات'),rq=activeReq(),mat=rq.filter(x=>match(x).length),listed=cars.filter(x=>!sold(x)),stock=listed.reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0);
-const cap=A('الشركاء').reduce((s,x)=>s+partnerStats(x).finalBalance,0);
+const cap=partnerFundsBalance();
 const ref=recoverableTotal();
-const cash=cashBalance();
+const cash=bookCashBalance();
 const realCash=cash-ref;
 kc.textContent=cars.length;klisted.textContent=listed.length;ks.textContent=money(stock);kcash.textContent=money(cash);if(typeof krealcash!=='undefined')krealcash.textContent=money(realCash);kr.textContent=rq.length;km.textContent=mat.length;kcap.textContent=money(cap);kref.textContent=money(ref);renderAlerts();dashReq.innerHTML=rq.map(r=>`<tr><td>${esc(r['اسم العميل'])}</td><td>${esc(r['السيارة المطلوبة'])}</td><td>${esc(r['الموديل'])}</td><td>${money(r['الميزانية'])}</td><td>${match(r).length?'<span class="tag ok">🔔 مطابقة</span>':'<span class="tag warn">انتظار</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد طلبات</td></tr>'}
 function renderCars(){let q=(cq.value||'');table('العربيات','carh','carb',q);const body=document.getElementById('carb');if(body){[...body.querySelectorAll('tr')].forEach((tr,ri)=>{const real=A('العربيات').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())))[ri];if(real&&sold(real.r)){const b=document.createElement('button');b.className='btn';b.textContent='↩️ إرجاع البيع';b.onclick=()=>returnSale(real.i);const cell=tr.lastElementChild;if(cell)cell.appendChild(document.createTextNode(' ')),cell.appendChild(b);}})}}
@@ -632,7 +644,7 @@ function renderPartners(){
  ph.innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>الأرباح</th><th>الإضافات</th><th>السحوبات</th><th>الرصيد الحالي</th><th>إجراء</th></tr>';
  pb.innerHTML=rows.map((p,i)=>{const st=partnerStats(p);return '<tr>'+hs.map(x=>`<td>${esc(p[x])}</td>`).join('')+`<td>${money(st.profit)}</td><td>${money(st.deposits)}</td><td>${money(st.withdrawals)}</td><td><b>${money(st.finalBalance)}</b></td><td><button class="btn" onclick="edit('الشركاء',${i})">تعديل</button> <button class="btn danger" onclick="del('الشركاء',${i})">حذف</button></td></tr>`}).join('')||'<tr><td colspan="9" class="empty">لا توجد بيانات</td></tr>';
 }
-function renderAll(){renderDash();renderCars();renderRequests();renderPartners();table('مساهمات العربيات','ch','cb');table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();renderEmployees();renderOriginal();let __cap=A('الشركاء').reduce((s,x)=>s+partnerStats(x).finalBalance,0),__stock=A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0),__cash=cashBalance(),__def=recoverableTotal();cashCurrent.textContent=money(__cash);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(__def);if(typeof cashReal!=='undefined')cashReal.textContent=money(__cash-__def)}
+function renderAll(){renderDash();renderCars();renderRequests();renderPartners();table('مساهمات العربيات','ch','cb');table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();renderEmployees();renderOriginal();const __fin=financialCashBalances();cashCurrent.textContent=money(__fin.book);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
 const fields={
 car:[['العربية','text'],['الموديل','number'],['سعر الشراء','number'],['عمولة الشراء','number'],['دفع من الخزنة؟','select','نعم|لا'],['مصدر العربية / المورد','text'],['رقم المورد','text'],['اسم العميل المشتري','text'],['رقم تليفون العميل','text'],['حالة البيع','select','لم تُسجل بيانات البيع بعد|تم الحجز|مباعة'],['سعر البيع','number'],['عمولة البيع','number'],['صافي الربح الحقيقي','number'],['ثلث المعرض','number'],['ثلثان للشركاء','number'],['ملاحظات','textarea']],
 request:[['التاريخ','date'],['اسم العميل','text'],['رقم التليفون','text'],['السيارة المطلوبة','text'],['الموديل','number'],['الميزانية','number'],['كاش/تقسيط','select','كاش|تقسيط'],['المقدم','number'],['اللون','text'],['الحالة','select','جديد|تم التواصل|بانتظار عربية|تم توفير عربية|تم البيع|مغلق'],['مسؤول الطلب','text'],['ملاحظات','textarea']],
