@@ -1026,7 +1026,6 @@ function saveWithdraw(){
   partner['إجمالي المبلغ المسجل']=current-amt;
   partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
   A('حركة الشركاء').push({'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':current-amt});
-  A('حركة الخزنة').push({'التاريخ':date,'نوع الحركة':'سحب شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':cashBalance()-amt,'ملاحظات':wn.value||''});
   save(); closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة');
 }
 function showroomProfitTotals(){
