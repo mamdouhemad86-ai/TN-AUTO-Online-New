@@ -420,7 +420,7 @@ function initOnline(){
 <div class="footer">الكاش الحقيقي = رصيد الخزنة الدفتري − العجز المتبقي في «مبالغ تسترد». البيانات الجديدة محفوظة محلياً على نفس الجهاز. عند نشر النظام على GitHub Pages، نحتاج قاعدة بيانات أونلاين إذا أردت استخدامها من أكثر من جهاز.</div></main>
 
 <div id="modalbox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2 id="mt"></h2><button class="btn" onclick="closeModal()">إغلاق</button></div><div id="mf"></div></div></div>
-<div id="salebox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💰 بيع عربية</h2><button class="btn" onclick="closeSale()">إغلاق</button></div><div class="form"><div class="field span2"><label>العربية</label><select id="sc" onchange="updateSaleProfitPreview()"></select></div><div class="field"><label>سعر البيع</label><input id="sp" type="number" oninput="updateSaleProfitPreview()"></div><div class="field"><label>عمولة البيع</label><input id="scom" type="number" value="0" oninput="updateSaleProfitPreview()"></div><div class="field"><label>مبلغ المعرض</label><input id="showroomActualProfit" type="number" min="0" step="0.01" placeholder="افتراضي 33.33%" oninput="updateSaleProfitPreview()"></div><div class="field"><label>نسبة المعرض</label><input id="showroomPct" type="number" min="0" max="100" step="0.01" value="33.33" oninput="this.dataset.manual='1';updateSaleProfitPreview()"></div><div class="field"><label>مبلغ الشركاء</label><input id="partnersActualProfit" type="number" min="0" step="0.01" placeholder="الباقي تلقائيًا" oninput="this.dataset.manual='1';updateSaleProfitPreview()"></div><div class="field"><label>نسبة الشركاء</label><input id="partnerPct" type="number" readonly value="66.67"></div><div class="field span3"><div id="saleProfitPreview" class="note" style="margin-top:0">أدخل سعر البيع لعرض صافي الربح والتوزيع.</div></div><div class="field span3"><div id="partnerProfitInputs" class="panel" style="display:none;padding:12px"><b>توزيع أرباح الشركاء — اكتب المبلغ الفعلي لكل شريك</b><div id="partnerProfitRows" style="margin-top:10px"></div></div></div><div class="field"><label>اسم المشتري</label><input id="sb"></div><div class="field"><label>رقم الهاتف</label><input id="sphone"></div><div class="field span3"><label>ملاحظات</label><textarea id="snotes"></textarea></div></div><br><button class="btn primary" onclick="saveSale()">حفظ البيع</button></div></div>
+<div id="salebox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💰 بيع عربية</h2><button class="btn" onclick="closeSale()">إغلاق</button></div><div class="form"><div class="field span2"><label>العربية</label><select id="sc" onchange="updateSaleProfitPreview()"></select></div><div class="field"><label>سعر البيع</label><input id="sp" type="number" oninput="updateSaleProfitPreview()"></div><div class="field"><label>عمولة البيع</label><input id="scom" type="number" value="0" oninput="updateSaleProfitPreview()"></div><div class="field"><label>مبلغ المعرض</label><input id="showroomActualProfit" type="number" min="0" step="1" inputmode="numeric" placeholder="افتراضي ثلث الربح" oninput="this.dataset.manual='1';updateSaleProfitPreview()"></div><div class="field"><label>مبلغ الشركاء</label><input id="partnersActualProfit" type="number" min="0" step="1" inputmode="numeric" placeholder="الباقي تلقائيًا" readonly></div><div class="field span3"><div id="saleProfitPreview" class="note" style="margin-top:0">أدخل سعر البيع لعرض صافي الربح والتوزيع.</div></div><div class="field span3"><div id="partnerProfitInputs" class="panel" style="display:none;padding:12px"><b>توزيع أرباح الشركاء — اكتب المبلغ الفعلي لكل شريك</b><div id="partnerProfitRows" style="margin-top:10px"></div></div></div><div class="field"><label>اسم المشتري</label><input id="sb"></div><div class="field"><label>رقم الهاتف</label><input id="sphone"></div><div class="field span3"><label>ملاحظات</label><textarea id="snotes"></textarea></div></div><br><button class="btn primary" onclick="saveSale()">حفظ البيع</button></div></div>
 <div id="wdBox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💸 سحب شريك</h2><button class="btn" onclick="closeWd()">إغلاق</button></div><div class="form"><div class="field"><label>الشريك</label><select id="wp"></select></div><div class="field"><label>التاريخ</label><input id="wd" type="date"></div><div class="field"><label>المبلغ</label><input id="wa" type="number"></div><div class="field span2"><label>البيان</label><input id="wst" value="سحب شريك"></div><div class="field"><label>ملاحظات</label><input id="wn"></div></div><br><button class="btn primary" onclick="saveWithdraw()">حفظ السحب</button></div></div>
 <div id="cashBox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2>💵 حركة خزنة</h2><button class="btn" onclick="closeCash()">إغلاق</button></div><div class="form"><div class="field"><label>التاريخ</label><input id="cd" type="date"></div><div class="field"><label>نوع الحركة</label><input id="ct"></div><div class="field"><label>العربية/البند</label><input id="ci"></div><div class="field"><label>المبلغ</label><input id="ca" type="number"></div><div class="field"><label>داخل</label><input id="cin" type="number" value="0"></div><div class="field"><label>خارج</label><input id="cout" type="number" value="0"></div><div class="field span3"><label>ملاحظات</label><textarea id="cn"></textarea></div></div><br><button class="btn primary" onclick="saveCash()">حفظ الحركة</button></div></div>
 
@@ -848,14 +848,64 @@ async function del(s,i){
   save();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحذف وتحديث الحسابات';
 }
 function getCarPartnerShares(car){const out=[];String(car?.['مساهمات الشركاء']||'').split('|').map(x=>x.trim()).filter(Boolean).forEach(part=>{const m=part.match(/^(.+?):\s*([\d.,]+)/);if(!m)return;const name=m[1].trim(),amount=Number(m[2].replace(/,/g,''))||0;if(amount>0)out.push({name,amount});});return out;}
-function distributePartnerPercentages(changedEl){const rows=[...document.querySelectorAll('.partner-profit-pct')];if(!rows.length)return;const shares=rows.map(e=>({el:e,name:e.dataset.partner,base:Number(e.dataset.basePct)||0,manual:e.dataset.manual==='1',pct:Math.max(0,Math.min(100,Number(e.value)||0))}));if(changedEl){const item=shares.find(x=>x.el===changedEl);if(item)item.manual=true;}const manual=shares.filter(x=>x.manual),fixed=manual.reduce((s,x)=>s+x.pct,0),flex=shares.filter(x=>!x.manual),remain=Math.max(0,100-fixed),baseFlex=flex.reduce((s,x)=>s+x.base,0);flex.forEach(x=>{x.pct=baseFlex>0?remain*x.base/baseFlex:(flex.length?remain/flex.length:0);x.el.value=x.pct.toFixed(2);});shares.forEach(x=>{if(x.manual)x.el.value=x.pct.toFixed(2);});const c=A('العربيات')[Number(sc?.value)],sell=Number(sp?.value)||0,com=Number(scom?.value)||0,profit=Math.max(0,sell-(Number(c?.['سعر الشراء'])||0)-(Number(c?.['عمولة الشراء'])||0)-com),showroom=Math.min(profit,Number(showroomActualProfit?.value)||profit*(Number(showroomPct?.value)||33.33)/100),pool=Math.max(0,profit-showroom);shares.forEach(x=>{const amount=pool*(Number(x.el.value)||0)/100;const amountEl=[...document.querySelectorAll('.partner-profit-amount')].find(e=>e.dataset.partner===x.name);if(amountEl)amountEl.value=amount.toFixed(2);});const sum=shares.reduce((s,x)=>s+(Number(x.el.value)||0),0),note=document.getElementById('partnerDistributionNote');if(note)note.textContent=`إجمالي نسب الشركاء: ${sum.toFixed(2)}% — المتبقي بعد زيادة أي شريك يتوزع تلقائيًا على باقي الشركاء حسب مساهماتهم.`;}
-function renderPartnerProfitInputs(c,pool){const host=document.getElementById('partnerProfitInputs'),rows=document.getElementById('partnerProfitRows');if(!host||!rows)return;const shares=getCarPartnerShares(c);if(!shares.length){host.style.display='none';rows.innerHTML='';return;}const totalInvested=shares.reduce((s,x)=>s+x.amount,0);rows.innerHTML=shares.map(x=>{const basePct=totalInvested>0?x.amount/totalInvested*100:100/shares.length,amount=pool*basePct/100;return `<div class="partner-profit-row" style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:8px;align-items:center;margin:7px 0"><b>${esc(x.name)}</b><span>مساهمة: ${money(x.amount)}</span><label style="display:flex;gap:5px;align-items:center">نسبة <input class="partner-profit-pct" data-partner="${esc(x.name)}" data-base-pct="${basePct}" type="number" min="0" max="100" step="0.01" value="${basePct.toFixed(2)}"></label><label style="display:flex;gap:5px;align-items:center">الربح <input class="partner-profit-amount" data-partner="${esc(x.name)}" type="number" min="0" step="0.01" value="${amount.toFixed(2)}"></label></div>`;}).join('')+`<div id="partnerDistributionNote" class="note" style="margin-top:8px">إجمالي نسب الشركاء: 100.00%</div>`;host.style.display='block';rows.querySelectorAll('.partner-profit-pct').forEach(el=>el.addEventListener('input',()=>{el.dataset.manual='1';distributePartnerPercentages(el);}));rows.querySelectorAll('.partner-profit-amount').forEach(el=>el.addEventListener('input',()=>{const pctEl=[...rows.querySelectorAll('.partner-profit-pct')].find(e=>e.dataset.partner===el.dataset.partner);const c2=A('العربيات')[Number(sc?.value)],sell2=Number(sp?.value)||0,com2=Number(scom?.value)||0,profit=Math.max(0,sell2-(Number(c2?.['سعر الشراء'])||0)-(Number(c2?.['عمولة الشراء'])||0)-com2),showroom=Math.min(profit,Number(showroomActualProfit?.value)||profit*(Number(showroomPct?.value)||33.33)/100),pool2=Math.max(0,profit-showroom);if(pctEl){pctEl.dataset.manual='1';pctEl.value=(pool2>0?Math.max(0,Number(el.value)||0)/pool2*100:0).toFixed(2);distributePartnerPercentages(pctEl);}}));}
+function roundWhole(n){return Math.round(Number(n)||0);}
+function distributePartnerAmounts(changedEl){
+  const rows=[...document.querySelectorAll('.partner-profit-amount')];
+  if(!rows.length)return;
+  const shares=rows.map(e=>({el:e,name:e.dataset.partner,base:Number(e.dataset.baseAmount)||0,manual:e.dataset.manual==='1',amount:Math.max(0,roundWhole(e.value))}));
+  if(changedEl){const item=shares.find(x=>x.el===changedEl);if(item)item.manual=true;}
+  const c=A('العربيات')[Number(sc?.value)],sell=Number(sp?.value)||0,com=Number(scom?.value)||0;
+  const profit=sell-(Number(c?.['سعر الشراء'])||0)-(Number(c?.['عمولة الشراء'])||0)-com;
+  const total=Math.max(0,roundWhole(profit));
+  let showroom=Math.min(total,Math.max(0,roundWhole(showroomActualProfit?.value)));
+  const pool=Math.max(0,total-showroom);
+  const manual=shares.filter(x=>x.manual);
+  const flex=shares.filter(x=>!x.manual);
+  let fixed=manual.reduce((s,x)=>s+x.amount,0);
+  if(fixed>pool){
+    const changed=shares.find(x=>x.el===changedEl);
+    if(changed){changed.amount=Math.max(0,pool-(fixed-changed.amount));changed.el.value=String(changed.amount);}
+    fixed=manual.reduce((s,x)=>s+x.amount,0);
+  }
+  let remain=Math.max(0,pool-fixed);
+  const baseFlex=flex.reduce((s,x)=>s+x.base,0);
+  const allocations=[];
+  let allocated=0;
+  flex.forEach((x,i)=>{
+    const raw=baseFlex>0?remain*x.base/baseFlex:(flex.length?remain/flex.length:0);
+    const flo=Math.floor(raw);
+    allocations.push({x,raw,flo,frac:raw-flo,i});
+    allocated+=flo;
+  });
+  let leftover=remain-allocated;
+  allocations.sort((a,b)=>b.frac-a.frac || a.i-b.i);
+  allocations.forEach((a,idx)=>{a.x.amount=a.flo+(idx<leftover?1:0);});
+  shares.forEach(x=>{if(x.manual)x.amount=Math.max(0,roundWhole(x.amount));x.el.value=String(x.amount);});
+  const sum=shares.reduce((s,x)=>s+x.amount,0);
+  if(partnersActualProfit){partnersActualProfit.value=String(sum);}
+  const note=document.getElementById('partnerDistributionNote');
+  if(note)note.textContent=`إجمالي أرباح الشركاء: ${money(sum)} — أي مبلغ تعدّله لشريك يتم تثبيته، والباقي يتوزع تلقائيًا على باقي الشركاء حسب مساهماتهم، وكل الأرقام بالجنيه الصحيح.`;
+}
+function renderPartnerProfitInputs(c,pool){
+  const host=document.getElementById('partnerProfitInputs'),rows=document.getElementById('partnerProfitRows');
+  if(!host||!rows)return;
+  const shares=getCarPartnerShares(c);
+  if(!shares.length){host.style.display='none';rows.innerHTML='';return;}
+  const totalInvested=shares.reduce((s,x)=>s+x.amount,0),wholePool=roundWhole(pool);
+  rows.innerHTML=shares.map(x=>{
+    const amount=totalInvested>0?Math.round(wholePool*x.amount/totalInvested):Math.floor(wholePool/shares.length);
+    return `<div class="partner-profit-row" style="display:grid;grid-template-columns:1.4fr 1fr 1.2fr;gap:8px;align-items:center;margin:7px 0"><b>${esc(x.name)}</b><span>مساهمة: ${money(x.amount)}</span><label style="display:flex;gap:5px;align-items:center">ربح الشريك <input class="partner-profit-amount" data-partner="${esc(x.name)}" data-base-amount="${x.amount}" type="number" min="0" step="1" inputmode="numeric" value="${amount}"></label></div>`;
+  }).join('')+`<div id="partnerDistributionNote" class="note" style="margin-top:8px">إجمالي أرباح الشركاء: ${money(wholePool)} — اكتب المبلغ الذي تريده لأي شريك، والباقي يتوزع تلقائيًا.</div>`;
+  host.style.display='block';
+  const amountEls=[...rows.querySelectorAll('.partner-profit-amount')];
+  amountEls.forEach(el=>el.dataset.manual='');
+  amountEls.forEach(el=>el.addEventListener('input',()=>{el.dataset.manual='1';el.value=String(Math.max(0,roundWhole(el.value)));distributePartnerAmounts(el);}));
+  distributePartnerAmounts();
+}
 function distributeSaleProfit(car,profit,showroom,amounts){const shares=getCarPartnerShares(car);if(!shares.length)throw new Error('لا توجد مساهمات شركاء مسجلة لهذه العربية.');const pool=Math.max(0,profit-showroom),total=shares.reduce((s,x)=>s+x.amount,0),vals=shares.map(x=>({name:x.name,amount:Math.max(0,Number(amounts?.[x.name])||0)}));if(Math.abs(vals.reduce((s,x)=>s+x.amount,0)-pool)>0.01)throw new Error('إجمالي أرباح الشركاء لا يساوي المبلغ المتاح للشركاء.');const tx=A('حركة الشركاء');for(let j=tx.length-1;j>=0;j--)if(Number(tx[j].car_id)===Number(car.id)&&String(tx[j]['نوع الحركة'])==='ربح')tx.splice(j,1);vals.forEach(v=>{if(v.amount>0)tx.push({'الشريك':v.name,'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'ربح','البيان':'ربح بيع '+cname(car),'المبلغ':v.amount,'ربح من العربيات':v.amount,'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':Number(car.id)});});const sh=A('ربح المعرض');for(let j=sh.length-1;j>=0;j--)if(Number(sh[j].car_id)===Number(car.id))sh.splice(j,1);sh.push({'العربية':cname(car),'التاريخ':new Date().toISOString().slice(0,10),'صافي الربح الحقيقي':profit,'ربح المعرض':showroom,'نسبة المعرض':profit>0?showroom/profit*100:0,'car_id':Number(car.id)});return {totalInvested:total};}
 function resetSaleDistribution(){
   if(typeof showroomActualProfit!=='undefined' && showroomActualProfit){showroomActualProfit.value='';delete showroomActualProfit.dataset.manual;}
-  if(typeof showroomPct!=='undefined' && showroomPct){showroomPct.value='33.33';delete showroomPct.dataset.manual;}
-  if(typeof partnersActualProfit!=='undefined' && partnersActualProfit){partnersActualProfit.value='';delete partnersActualProfit.dataset.manual;}
-  if(typeof partnerPct!=='undefined' && partnerPct){partnerPct.value='66.67';}
+  if(typeof partnersActualProfit!=='undefined' && partnersActualProfit){partnersActualProfit.value='';}
 }
 function saleModal(){
   let a=A('العربيات').map((c,i)=>({c,i})).filter(x=>!sold(x.c));
@@ -867,8 +917,36 @@ function saleModal(){
   salebox.classList.remove('hidden');
 }
 function closeSale(){salebox.classList.add('hidden')}
-function updateSaleProfitPreview(){const c=A('العربيات')[Number(sc?.value)],sell=Number(sp?.value)||0,com=Number(scom?.value)||0;if(!c||!sell){if(saleProfitPreview)saleProfitPreview.innerHTML='أدخل سعر البيع لعرض صافي الربح والتوزيع.';return}const p=sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com;const total=Math.max(0,p);const showroomHas=showroomActualProfit?.dataset.manual==='1'&&String(showroomActualProfit.value).trim()!=='';const poolHas=partnersActualProfit?.dataset.manual==='1'&&String(partnersActualProfit.value).trim()!=='';const pctHas=showroomPct?.dataset.manual==='1'&&String(showroomPct.value).trim()!=='';let showroom=0,pool=total,pct=33.33;if(showroomHas&&Number.isFinite(Number(showroomActualProfit.value))&&Number(showroomActualProfit.value)>=0){showroom=Math.min(Number(showroomActualProfit.value),total);pool=total-showroom;pct=p>0?showroom/p*100:0;showroomPct.value=pct.toFixed(2)}else if(poolHas&&Number.isFinite(Number(partnersActualProfit.value))&&Number(partnersActualProfit.value)>=0){pool=Math.min(Number(partnersActualProfit.value),total);showroom=total-pool;pct=p>0?showroom/p*100:0;showroomActualProfit.value=showroom.toFixed(2)}else if(pctHas&&Number.isFinite(Number(showroomPct.value))){pct=Math.max(0,Math.min(100,Number(showroomPct.value)));showroom=total*pct/100;pool=total-showroom;showroomActualProfit.value=showroom.toFixed(2)}else{pct=33.33;showroom=total*pct/100;pool=total-showroom;showroomActualProfit.value=showroom.toFixed(2);showroomPct.value=pct.toFixed(2)}const pp=p>0?pool/p*100:0;partnerPct.value=pp.toFixed(2);partnersActualProfit.value=pool.toFixed(2);saleProfitPreview.innerHTML=`صافي الربح: <b>${money(p)}</b> — المعرض: <b>${money(showroom)}</b> (${pct.toFixed(2)}%) — الشركاء: <b>${money(pool)}</b> (${pp.toFixed(2)}%) — الإجمالي: <b>${money(showroom+pool)}</b>`;const active=document.activeElement;if(!(active&&active.classList.contains('partner-profit-amount'))){renderPartnerProfitInputs(c,pool);}else{distributePartnerPercentages();}}
-function saveSale(){let i=Number(sc.value),c=A('العربيات')[i],sell=Number(sp.value)||0,com=Number(scom.value)||0;if(!c||!sell)return alert('اختار عربية واكتب سعر البيع');let p=sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com;if(p<0&&!confirm('صافي الربح سالب. هل تريد تسجيل البيع؟'))return;let showroom=0,pool=Math.max(0,p);const total=Math.max(0,p);const showroomManual=showroomActualProfit?.dataset.manual==='1'&&String(showroomActualProfit.value).trim()!=='';const poolManual=partnersActualProfit?.dataset.manual==='1'&&String(partnersActualProfit.value).trim()!=='';const pctManual=showroomPct?.dataset.manual==='1'&&String(showroomPct.value).trim()!=='';if(showroomManual&&Number.isFinite(Number(showroomActualProfit.value))&&Number(showroomActualProfit.value)>=0){showroom=Math.min(Number(showroomActualProfit.value),total);pool=total-showroom}else if(poolManual&&Number.isFinite(Number(partnersActualProfit.value))&&Number(partnersActualProfit.value)>=0){pool=Math.min(Number(partnersActualProfit.value),total);showroom=total-pool}else if(pctManual&&Number.isFinite(Number(showroomPct.value))){const pct=Math.max(0,Math.min(100,Number(showroomPct.value)));showroom=total*pct/100;pool=total-showroom}else{showroom=total/3;pool=total-showroom}const inputs=document.querySelectorAll('.partner-profit-amount'),amounts={};let sum=0;inputs.forEach(e=>{const v=Number(e.value);if(Number.isFinite(v)&&v>=0){amounts[e.dataset.partner]=v;sum+=v}});const pctInputs=[...document.querySelectorAll('.partner-profit-pct')],pctSum=pctInputs.reduce((s,e)=>s+(Number(e.value)||0),0);if(pctInputs.length&&Math.abs(pctSum-100)>0.05)return alert(`نسب أرباح الشركاء يجب أن تساوي 100%. الحالي ${pctSum.toFixed(2)}%`);if(inputs.length&&Math.abs(sum-pool)>0.01)return alert(`مبالغ الشركاء يجب أن تساوي ${pool.toFixed(2)} ج.م بالضبط. الحالي ${sum.toFixed(2)} ج.م`);try{distributeSaleProfit(c,p,showroom,amounts)}catch(e){return alert(e.message||e)}c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['ملاحظات']=snotes.value;const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً'});save();closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع';alert('تم تسجيل البيع وتحديث المخزون والربح والخزنة')}
+function updateSaleProfitPreview(){
+  const c=A('العربيات')[Number(sc?.value)],sell=Number(sp?.value)||0,com=Number(scom?.value)||0;
+  if(!c||!sell){if(saleProfitPreview)saleProfitPreview.innerHTML='أدخل سعر البيع لعرض صافي الربح والتوزيع.';return}
+  const rawProfit=sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com;
+  const p=roundWhole(rawProfit),total=Math.max(0,p);
+  const hasShowroom=showroomActualProfit?.dataset.manual==='1'&&String(showroomActualProfit.value).trim()!=='';
+  let showroom=hasShowroom?Math.min(total,Math.max(0,roundWhole(showroomActualProfit.value))):Math.floor(total/3);
+  showroomActualProfit.value=String(showroom);
+  const pool=Math.max(0,total-showroom);
+  partnersActualProfit.value=String(pool);
+  saleProfitPreview.innerHTML=`صافي الربح: <b>${money(p)}</b> — المعرض: <b>${money(showroom)}</b> — الشركاء: <b>${money(pool)}</b> — كل التحكم بالمبالغ الصحيحة بدون كسور.`;
+  renderPartnerProfitInputs(c,pool);
+}
+function saveSale(){
+  let i=Number(sc.value),c=A('العربيات')[i],sell=roundWhole(sp.value),com=roundWhole(scom.value);
+  if(!c||!sell)return alert('اختار عربية واكتب سعر بيع صحيح');
+  let p=roundWhole(sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com);
+  if(p<0&&!confirm('صافي الربح سالب. هل تريد تسجيل البيع؟'))return;
+  const total=Math.max(0,p);
+  let showroom=Math.min(total,Math.max(0,roundWhole(showroomActualProfit?.value)));
+  const pool=Math.max(0,total-showroom);
+  const inputs=[...document.querySelectorAll('.partner-profit-amount')],amounts={};
+  let sum=0;
+  inputs.forEach(e=>{const v=Math.max(0,roundWhole(e.value));e.value=String(v);amounts[e.dataset.partner]=v;sum+=v;});
+  if(inputs.length&&sum!==pool)return alert(`إجمالي أرباح الشركاء يجب أن يساوي ${money(pool)} ج.م بالضبط. الحالي ${money(sum)} ج.م`);
+  try{distributeSaleProfit(c,p,showroom,amounts)}catch(e){return alert(e.message||e)}
+  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;c['ملاحظات']=snotes.value;
+  const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً'});
+  save();closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع';alert('تم تسجيل البيع وتحديث المخزون والربح والخزنة');
+}
 function additionalDepositModal(){
   const partners=A('الشركاء');
   if(!partners.length){alert('لا يوجد شركاء مسجلون');return;}
