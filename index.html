@@ -497,7 +497,7 @@ const ref=recoverableTotal();
 const cash=cashBalance();
 const realCash=cash-ref;
 kc.textContent=cars.length;klisted.textContent=listed.length;ks.textContent=money(stock);kcash.textContent=money(cash);if(typeof krealcash!=='undefined')krealcash.textContent=money(realCash);kr.textContent=rq.length;km.textContent=mat.length;kcap.textContent=money(cap);kref.textContent=money(ref);renderAlerts();dashReq.innerHTML=rq.map(r=>`<tr><td>${esc(r['اسم العميل'])}</td><td>${esc(r['السيارة المطلوبة'])}</td><td>${esc(r['الموديل'])}</td><td>${money(r['الميزانية'])}</td><td>${match(r).length?'<span class="tag ok">🔔 مطابقة</span>':'<span class="tag warn">انتظار</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد طلبات</td></tr>'}
-function renderCars(){let q=(cq.value||'');table('العربيات','carh','carb',q)}
+function renderCars(){let q=(cq.value||'');table('العربيات','carh','carb',q);const body=document.getElementById('carb');if(body){[...body.querySelectorAll('tr')].forEach((tr,ri)=>{const real=A('العربيات').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())))[ri];if(real&&sold(real.r)){const b=document.createElement('button');b.className='btn';b.textContent='↩️ إرجاع البيع';b.onclick=()=>returnSale(real.i);const cell=tr.lastElementChild;if(cell)cell.appendChild(document.createTextNode(' ')),cell.appendChild(b);}})}}
 function renderRequests(){let q=(rq.value||''),hs=h('طلبات العملاء'),rs=A('طلبات العملاء').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())));reqh.innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>مطابقة</th><th>إجراء</th></tr>';reqb.innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td>${match(r).length?'<span class="tag ok">🔔 '+match(r).length+'</span>':'<span class="tag warn">لا توجد</span>'}</td><td><button class="btn" onclick="edit('طلبات العملاء',${i})">تعديل</button> <button class="btn danger" onclick="del('طلبات العملاء',${i})">حذف</button></td></tr>`).join('')||'<tr><td colspan="15" class="empty">لا توجد طلبات</td></tr>'}
 function partnerStats(p){
   const name=String(p['الشريك']||'');
@@ -946,8 +946,38 @@ function saveSale(){
   if(inputs.length&&sum!==pool)return alert(`إجمالي أرباح الشركاء يجب أن يساوي ${money(pool)} ج.م بالضبط. الحالي ${money(sum)} ج.م`);
   try{distributeSaleProfit(c,p,showroom,amounts)}catch(e){return alert(e.message||e)}
   c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;c['ملاحظات']=snotes.value;
-  const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً'});
+  const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً','car_id':Number(c.id)});
   save();closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع';alert('تم تسجيل البيع وتحديث المخزون والربح والخزنة');
+}
+function returnSale(index){
+  const cars=A('العربيات'), c=cars[Number(index)];
+  if(!c||!sold(c)||!Number(c['سعر البيع'])) return alert('العربية دي مش مسجلة كمباعة.');
+  const originalName=c['العربية']||'', originalSale=roundWhole(c['سعر البيع']), originalCom=roundWhole(c['عمولة البيع']);
+  const profit=roundWhole(c['صافي الربح الحقيقي']);
+  if(!confirm(`تأكيد إرجاع بيع العربية: ${originalName}؟\nسيتم عكس البيع والخزنة وأرباح الشركاء وربح المعرض، وإرجاع العربية للمخزون.`)) return;
+  const date=new Date().toISOString().slice(0,10), carId=Number(c.id)||null;
+  // Reverse the partner profit entries for this exact car.
+  const mv=A('حركة الشركاء');
+  const saleMoves=mv.filter(x=>String(x['نوع الحركة'])==='ربح' && (Number(x.car_id)===carId || String(x['البيان']||'')===('ربح بيع '+originalName)) && !String(x['البيان']||'').includes('[SALE-REVERSAL]'));
+  saleMoves.forEach(x=>mv.push({'الشريك':x['الشريك'],'التاريخ':date,'نوع الحركة':'ربح','البيان':'[SALE-REVERSAL] عكس ربح بيع '+originalName,'المبلغ':-Math.abs(roundWhole(x['المبلغ']||x['ربح من العربيات'])),'ربح من العربيات':-Math.abs(roundWhole(x['ربح من العربيات']||x['المبلغ'])),'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':carId}));
+  // Reverse showroom profit without deleting its history.
+  const sh=A('ربح المعرض');
+  const shRows=sh.filter(x=>Number(x.car_id)===carId && !String(x['ملاحظات']||'').includes('[SALE-REVERSAL]'));
+  shRows.forEach(x=>sh.push({'العربية':originalName,'التاريخ':date,'صافي الربح الحقيقي':-Math.abs(roundWhole(x['صافي الربح الحقيقي']||profit)),'ربح المعرض':-Math.abs(roundWhole(x['ربح المعرض'])),'نسبة المعرض':0,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] عكس ربح المعرض'}));
+  // Reverse the original sale cash movement, preserving the ledger history.
+  const cash=A('حركة الخزنة');
+  const saleCash=cash.find(x=>(Number(x.car_id)===carId || String(x['العربية/البند']||'')===originalName) && String(x['ملاحظات']||'').includes('[AUTO-SALE]') && !String(x['ملاحظات']||'').includes('[SALE-REVERSAL]'));
+  const saleIn=saleCash?roundWhole(saleCash['داخل']||saleCash['المبلغ']):originalSale;
+  const saleOut=saleCash?roundWhole(saleCash['خارج']):originalCom;
+  const bal=cashBalance();
+  cash.push({'id':nextLocalId('حركة الخزنة'),'التاريخ':date,'نوع الحركة':'إرجاع بيع عربية','العربية/البند':originalName,'المبلغ':saleIn,'داخل':saleOut,'خارج':saleIn,'الرصيد':bal+saleOut-saleIn,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] عكس عملية بيع العربية بالكامل'});
+  // Keep a trace of the returned sale while making the car available again.
+  c['حالة البيع']='مرتجعة'; c['تاريخ إرجاع البيع']=date; c['سبب إرجاع البيع']='إرجاع عملية البيع';
+  c['سعر البيع الأصلي']=originalSale; c['عمولة البيع الأصلية']=originalCom; c['ربح البيع الأصلي']=profit;
+  c['سعر البيع']=''; c['عمولة البيع']=0; c['اسم المشتري']=''; c['هاتف المشتري']=''; c['تاريخ البيع']=''; c['صافي الربح الحقيقي']=''; c['نسبة المعرض']=''; c['نسبة الشركاء']=''; c['مبلغ المعرض']=''; c['مبلغ الشركاء']='';
+  save();renderAll();renderCars();
+  if(typeof sysStatus!=='undefined')sysStatus.textContent='تم إرجاع البيع وعكس آثاره';
+  alert('تم إرجاع البيع بنجاح. العربية رجعت للمخزون وتم عكس حركة الخزنة وأرباح الشركاء وربح المعرض.');
 }
 function additionalDepositModal(){
   const partners=A('الشركاء');
@@ -988,7 +1018,7 @@ function saveWithdraw(){
   save(); closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة');
 }
 function showroomProfitTotals(){
-  const earned=A('ربح المعرض').reduce((s,x)=>s+Math.max(0,roundWhole(x['ربح المعرض'])),0);
+  const earned=A('ربح المعرض').reduce((s,x)=>{const v=roundWhole(x['ربح المعرض']);const note=String(x['ملاحظات']||'');return s+(note.includes('[SALE-REVERSAL]')?-Math.abs(v):Math.max(0,v));},0);
   const deposited=A('حركة الخزنة').reduce((s,x)=>{
     const note=String(x['ملاحظات']||''); const type=String(x['نوع الحركة']||'');
     return s+(note.includes('[SHOWROOM-CASH-DEPOSIT]')||type==='إيداع كاش من المعرض'?Math.max(0,roundWhole(x['داخل']||x['المبلغ'])):0);
