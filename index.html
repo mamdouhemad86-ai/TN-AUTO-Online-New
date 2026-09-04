@@ -1280,13 +1280,14 @@ document.addEventListener('click',function(e){const el=e.target.closest('[onclic
       <div id="tn-login-error">بيانات الدخول غير صحيحة</div>
     </div>
   `;
+  document.body.classList.add('tn-auth-locked');
+  document.body.appendChild(screen);
+
+  // مهم: عناصر شاشة الدخول لازم تكون موجودة في DOM قبل الوصول إليها.
   const roleSel=document.getElementById('tn-login-role');
   const refreshRoles=()=>{const st=tnSecurityLoad();roleSel.innerHTML='<option value="manager">🔐 المدير</option>'+st.employees.filter(e=>e.active!==false).map(e=>`<option value="${esc(e.id)}">👤 ${esc(e.name)}</option>`).join('');};
   refreshRoles();
   roleSel.addEventListener('change',()=>{const isMgr=roleSel.value==='manager';document.getElementById('tn-login-email').style.display=isMgr?'':'none';});
-
-  document.body.classList.add('tn-auth-locked');
-  document.body.appendChild(screen);
 
   // لا نعتمد على جلسة Supabase القديمة لتجاوز شاشة الدخول.
   // كل تسجيل خروج يعيد طلب كلمة المرور فعليًا، مع بقاء بيانات النظام في Supabase/localStorage.
