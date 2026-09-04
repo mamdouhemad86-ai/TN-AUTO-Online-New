@@ -409,6 +409,9 @@ function initOnline(){
 .mobile-menu-btn { display: none; }
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.perm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.perm-item{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:9px;padding:9px;background:#fff}.perm-item input{width:18px;height:18px}.security-badge{font-size:11px;padding:4px 8px;border-radius:99px;background:#eef4ff;color:#175cd3}.print-preview{border:1px dashed var(--line);border-radius:10px;padding:14px;background:#fafafa}.settings-section-title{margin:0 0 10px}.danger-note{background:#fff4ed;border:1px solid #f6c7a6;padding:10px;border-radius:9px;font-size:12px}.logout-btn{background:#fff;border:1px solid #f04438;color:#b42318;border-radius:9px;padding:9px 12px;cursor:pointer;font-weight:700}@media(max-width:700px){.settings-grid,.perm-grid{grid-template-columns:1fr}}
 </style>
+<style id="sales-page-style">
+.sales-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.sale-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:14px;box-shadow:0 2px 8px rgba(16,24,40,.04)}.sale-card h3{margin:0 0 6px;font-size:17px}.sale-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.sale-price{font-size:20px;font-weight:800;margin:10px 0}.sale-agreed{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:10px}.sale-agreed input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px}.sale-card .btn{margin-top:8px}.sale-card.reserved{border-width:2px}.sale-status{font-weight:800}.sale-status.available{color:#067647}.sale-status.reserved{color:#b54708}@media(max-width:1000px){.sales-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.sales-grid{grid-template-columns:1fr}.sale-agreed{grid-template-columns:1fr}.sale-card .btn{width:100%}}
+</style>
 
 </head><body>
 
@@ -417,7 +420,7 @@ function initOnline(){
 
 <aside class="side"><div class="brand">🚗 TN Auto System</div><div class="nav">
 <div class="group">الرئيسية</div><button data-p="dash" class="active">لوحة التحكم</button>
-<div class="group">العربيات والعملاء</div><button data-p="cars">المخزون والعربيات</button><button data-p="requests">طلبات العملاء</button>
+<div class="group">العربيات والعملاء</div><button data-p="sales">💼 المبيعات</button><button data-p="cars">المخزون والعربيات</button><button data-p="requests">طلبات العملاء</button>
 <div class="group">المال والشركاء</div><button data-p="partners">الشركاء</button><button data-p="contrib">مساهمات العربيات</button><button data-p="cash">الخزنة</button><button data-p="moves">حركة الشركاء</button><button data-p="refunds">مبالغ تسترد</button><button data-p="profits">الأرباح</button><button data-p="employees">الموظفين</button>
 <div class="group">تقارير وبيانات</div><button data-p="reports">التقارير</button><button data-p="showroom">المعرض</button><div class="group">الإدارة</div><button data-p="settings">⚙️ الإعدادات والصلاحيات</button></div></aside>
 <main class="main"><div class="top"><div><h1 id="title">لوحة التحكم</h1><p>نظام إدارة المعرض</p></div><div class="actions"><span class="tag ok" id="sysStatus">جاهز</span><button class="btn" onclick="syncFromCloud()">☁️ مزامنة</button><button class="btn" onclick="renderAll()">تحديث</button><button class="btn" onclick="backup()">نسخة احتياطية</button><button class="btn" onclick="document.getElementById('restore').click()">استرجاع</button><input id="restore" type="file" accept=".json" style="display:none" onchange="restore(event)"></div></div>
@@ -426,7 +429,7 @@ function initOnline(){
 <div class="grid"><div class="panel"><h3>🔔 التنبيهات</h3><div id="alerts"></div></div><div class="panel"><h3>⚡ عمليات سريعة</h3><div class="toolbar"><button class="btn primary" onclick="modal('car')">➕ إضافة عربية</button><button class="btn" onclick="saleModal()">💰 بيع عربية</button><button class="btn" onclick="withdrawModal()">💸 سحب شريك</button><button class="btn" onclick="showroomWithdrawModal()">🏢 سحب ربح المعرض</button><button class="btn" onclick="showroomDepositModal()">🏢 إيداع كاش من المعرض</button><button class="btn" onclick="showroomExpenseModal()">💸 مصاريف المعرض</button><button class="btn" onclick="cashModal()">💵 حركة خزنة</button><button class="btn" onclick="modal('request')">👤 طلب عميل</button></div><p class="label">كل عملية من هنا تحدث الجداول المرتبطة بها تلقائياً.</p></div></div>
 <div class="panel" style="margin-top:14px"><h3>🚘 العملاء المنتظرون</h3><div class="tablewrap"><table class="table"><thead><tr><th>العميل</th><th>العربية</th><th>الموديل</th><th>الميزانية</th><th>التنبيه</th></tr></thead><tbody id="dashReq"></tbody></table></div></div></section>
 
-<section id="cars" class="page hidden"><div class="panel"><h2>المخزون والعربيات</h2><div class="toolbar"><input class="search" id="cq" placeholder="بحث..." oninput="renderCars()"><button class="btn primary" onclick="modal('car')">➕ إضافة عربية</button><button class="btn" onclick="saleModal()">💰 بيع عربية</button></div><div class="tablewrap"><table class="table"><thead id="carh"></thead><tbody id="carb"></tbody></table></div></div></section>
+<section id="sales" class="page hidden"><div class="panel"><div class="top" style="margin-bottom:10px"><div><h2>💼 المبيعات</h2><p class="label">عرض مبسط للموظفين بدون سعر الشراء أو مساهمات الشركاء أو أي بيانات داخلية.</p></div><div class="actions"><span class="tag ok" id="salesAvailableCount">0 متاح</span><span class="tag warn" id="salesReservedCount">0 محجوز</span></div></div><div class="toolbar"><input class="search" id="salesQ" placeholder="بحث بالماركة أو الموديل أو السنة..." oninput="renderSalesPage()"></div><div id="salesGrid" class="sales-grid"></div></div></section><section id="cars" class="page hidden"><div class="panel"><h2>المخزون والعربيات</h2><div class="toolbar"><input class="search" id="cq" placeholder="بحث..." oninput="renderCars()"><button class="btn primary" onclick="modal('car')">➕ إضافة عربية</button><button class="btn" onclick="saleModal()">💰 بيع عربية</button></div><div class="tablewrap"><table class="table"><thead id="carh"></thead><tbody id="carb"></tbody></table></div></div></section>
 <section id="requests" class="page hidden"><div class="panel"><h2>طلبات العملاء</h2><div class="toolbar"><input class="search" id="rq" placeholder="بحث..." oninput="renderRequests()"><button class="btn primary" onclick="modal('request')">➕ طلب جديد</button></div><div class="tablewrap"><table class="table"><thead id="reqh"></thead><tbody id="reqb"></tbody></table></div></div></section>
 <section id="partners" class="page hidden"><div class="panel"><h2>الشركاء</h2><div class="toolbar"><button class="btn primary" onclick="modal('partner')">➕ شريك</button><button class="btn" onclick="additionalDepositModal()">💰 إيداع إضافي لشريك</button><button class="btn" onclick="withdrawModal()">💸 سحب شريك</button></div><div class="tablewrap"><table class="table"><thead id="ph"></thead><tbody id="pb"></tbody></table></div></div></section>
 <section id="contrib" class="page hidden"><div class="panel"><h2>مساهمات العربيات</h2><div class="toolbar"><button class="btn primary" onclick="modal('contrib')">➕ مساهمة</button></div><div class="tablewrap"><table class="table"><thead id="ch"></thead><tbody id="cb"></tbody></table></div></div></section>
@@ -460,7 +463,7 @@ function migrate(){
   let bal=0; for(const x of realCash){bal+=(Number(x['داخل'])||0)-(Number(x['خارج'])||0);x['الرصيد']=bal;}
   save();
 }
-const P={dash:'لوحة التحكم',cars:'المخزون والعربيات',requests:'طلبات العملاء',partners:'الشركاء',contrib:'مساهمات العربيات',cash:'الخزنة',moves:'حركة الشركاء',refunds:'مبالغ تسترد',profits:'الأرباح',reports:'التقارير',employees:'الموظفين',showroom:'المعرض',settings:'الإعدادات والصلاحيات'};
+const P={dash:'لوحة التحكم',sales:'المبيعات',cars:'المخزون والعربيات',requests:'طلبات العملاء',partners:'الشركاء',contrib:'مساهمات العربيات',cash:'الخزنة',moves:'حركة الشركاء',refunds:'مبالغ تسترد',profits:'الأرباح',reports:'التقارير',employees:'الموظفين',showroom:'المعرض',settings:'الإعدادات والصلاحيات'};
 function save(sync=true){localStorage.setItem(KEY,JSON.stringify(S));if(sync&&onlineMode) queueCloudSync()}
 function A(s){return Array.isArray(S[s])?S[s]:(S[s]=[])}
 migrate();
@@ -528,7 +531,7 @@ const ref=recoverableTotal();
 const cash=bookCashBalance();
 const realCash=cash-ref;
 kc.textContent=cars.length;klisted.textContent=listed.length;ks.textContent=money(stock);kcash.textContent=money(cash);if(typeof krealcash!=='undefined')krealcash.textContent=money(realCash);kr.textContent=rq.length;km.textContent=mat.length;kcap.textContent=money(cap);kref.textContent=money(ref);renderAlerts();dashReq.innerHTML=rq.map(r=>`<tr><td>${esc(r['اسم العميل'])}</td><td>${esc(r['السيارة المطلوبة'])}</td><td>${esc(r['الموديل'])}</td><td>${money(r['الميزانية'])}</td><td>${match(r).length?'<span class="tag ok">🔔 مطابقة</span>':'<span class="tag warn">انتظار</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد طلبات</td></tr>'}
-function renderCars(){let q=(cq.value||'');table('العربيات','carh','carb',q);const body=document.getElementById('carb');if(body){[...body.querySelectorAll('tr')].forEach((tr,ri)=>{const real=A('العربيات').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())))[ri];if(real&&sold(real.r)){const b=document.createElement('button');b.className='btn';b.textContent='↩️ إرجاع البيع';b.onclick=()=>returnSale(real.i);const cell=tr.lastElementChild;if(cell)cell.appendChild(document.createTextNode(' ')),cell.appendChild(b);}})}}
+function renderCars(){let q=(cq.value||'');const __notes=A('العربيات').map(c=>c['ملاحظات']);if(!tnIsManager())A('العربيات').forEach(c=>{c['ملاحظات']=cleanSalesNotes(c)});table('العربيات','carh','carb',q);A('العربيات').forEach((c,i)=>{if(!tnIsManager()&&__notes[i]!==undefined)c['ملاحظات']=__notes[i]});const body=document.getElementById('carb');if(body){[...body.querySelectorAll('tr')].forEach((tr,ri)=>{const real=A('العربيات').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())))[ri];if(real&&sold(real.r)){const b=document.createElement('button');b.className='btn';b.textContent='↩️ إرجاع البيع';b.onclick=()=>returnSale(real.i);const cell=tr.lastElementChild;if(cell)cell.appendChild(document.createTextNode(' ')),cell.appendChild(b);}})}}
 function renderRequests(){let q=(rq.value||''),hs=h('طلبات العملاء'),rs=A('طلبات العملاء').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())));reqh.innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>مطابقة</th><th>إجراء</th></tr>';reqb.innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td>${match(r).length?'<span class="tag ok">🔔 '+match(r).length+'</span>':'<span class="tag warn">لا توجد</span>'}</td><td><button class="btn" onclick="edit('طلبات العملاء',${i})">تعديل</button> <button class="btn danger" onclick="del('طلبات العملاء',${i})">حذف</button></td></tr>`).join('')||'<tr><td colspan="15" class="empty">لا توجد طلبات</td></tr>'}
 function partnerStats(p){
   const name=String(p['الشريك']||'');
@@ -567,8 +570,8 @@ function renderProfits(){
 }
 const TN_SECURITY_KEY='TN_AUTO_SECURITY_V1';
 const TN_PRINT_KEY='TN_AUTO_PRINT_SETTINGS_V1';
-const TN_PERM_LABELS={dash:'لوحة التحكم',cars:'العربيات والمخزون',requests:'طلبات العملاء',partners:'الشركاء',contrib:'مساهمات العربيات',cash:'الخزنة',moves:'حركة الشركاء',refunds:'مبالغ تسترد',profits:'الأرباح',employees:'الموظفين',reports:'التقارير',showroom:'المعرض',settings:'الإعدادات والصلاحيات',add:'إضافة',edit:'تعديل',delete:'حذف',print:'طباعة',finance:'الحركات المالية'};
-const TN_DEFAULT_PERMS={dash:true,cars:true,requests:true,partners:true,contrib:true,cash:true,moves:true,refunds:true,profits:true,employees:true,reports:true,showroom:true,settings:false,add:true,edit:true,delete:false,print:true,finance:true};
+const TN_PERM_LABELS={dash:'لوحة التحكم',sales:'المبيعات',cars:'العربيات والمخزون',requests:'طلبات العملاء',partners:'الشركاء',contrib:'مساهمات العربيات',cash:'الخزنة',moves:'حركة الشركاء',refunds:'مبالغ تسترد',profits:'الأرباح',employees:'الموظفين',reports:'التقارير',showroom:'المعرض',settings:'الإعدادات والصلاحيات',add:'إضافة',edit:'تعديل',delete:'حذف',print:'طباعة',finance:'الحركات المالية'};
+const TN_DEFAULT_PERMS={dash:true,sales:true,cars:true,requests:true,partners:true,contrib:true,cash:true,moves:true,refunds:true,profits:true,employees:true,reports:true,showroom:true,settings:false,add:true,edit:true,delete:false,print:true,finance:true};
 function tnSecurityLoad(){try{return JSON.parse(localStorage.getItem(TN_SECURITY_KEY)||'null')||{employees:[],managerLabel:'المدير'}}catch{return {employees:[],managerLabel:'المدير'}}}
 function tnSecuritySave(x){localStorage.setItem(TN_SECURITY_KEY,JSON.stringify(x))}
 function tnPrintLoad(){try{return {...{company:'EL TAWFIK TN AUTO',fontSize:'12',paper:'A4',showLogo:'yes',showDate:'yes',showFooter:'yes'},...(JSON.parse(localStorage.getItem(TN_PRINT_KEY)||'null')||{})}}catch{return {company:'EL TAWFIK TN AUTO',fontSize:'12',paper:'A4',showLogo:'yes',showDate:'yes',showFooter:'yes'}}}
@@ -788,7 +791,77 @@ function renderActiveContribTable(){
   document.getElementById(head).innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>إجراء</th></tr>';
   document.getElementById(body).innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td><button class="btn" onclick="edit('${sheet}',${i})">تعديل</button> <button class="btn danger" onclick="del('${sheet}',${i})">حذف</button></td></tr>`).join('')||`<tr><td colspan="${hs.length+1}" class="empty">لا توجد مساهمات لعربيات حالية</td></tr>`;
 }
-function renderAll(){renderDash();renderCars();renderRequests();renderPartners();renderActiveContribTable();table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();if(typeof renderShowroomDashboard==='function')renderShowroomDashboard();renderEmployees();const __fin=financialCashBalances();cashCurrent.textContent=money(__fin.book);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
+function salesMeta(c){
+  const raw=String(c?.['ملاحظات']||'');
+  const get=(k)=>{const m=raw.match(new RegExp('(?:^|\n)'+k+'=([^\n]*)'));return m?m[1].trim():''};
+  const clean=(v)=>String(v||'').replace(/,/g,'');
+  return {expected:Math.max(0,roundWhole(clean(get('__TN_EXPECTED_SALE__'))),),agreed:Math.max(0,roundWhole(clean(get('__TN_AGREED_SALE__')))),reserved:get('__TN_RESERVED__')==='1'};
+}
+function setSalesMeta(c,meta){
+  const raw=String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED)=/.test(x));
+  if(Number(meta.expected)>0)raw.push('__TN_EXPECTED_SALE__='+roundWhole(meta.expected));
+  if(Number(meta.agreed)>0)raw.push('__TN_AGREED_SALE__='+roundWhole(meta.agreed));
+  if(meta.reserved)raw.push('__TN_RESERVED__=1');
+  c['ملاحظات']=raw.join('\n');
+}
+function cleanSalesNotes(c){
+  return String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED)=/.test(x)).join('\n');
+}
+function renderSalesPage(){
+  const grid=document.getElementById('salesGrid'); if(!grid)return;
+  const q=normText(document.getElementById('salesQ')?.value||'');
+  const active=A('العربيات').map((c,i)=>({c,i})).filter(x=>!sold(x.c));
+  const rows=active.filter(({c})=>{
+    if(!q)return true;
+    const text=normText([c['العربية'],c['الموديل'],c['السنة']].join(' '));
+    return text.includes(q);
+  });
+  let reservedCount=0; active.forEach(x=>{if(salesMeta(x.c).reserved)reservedCount++;});
+  const av=document.getElementById('salesAvailableCount'),rc=document.getElementById('salesReservedCount');
+  if(av)av.textContent=(active.length-reservedCount)+' متاح'; if(rc)rc.textContent=reservedCount+' محجوز';
+  if(!rows.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1">لا توجد عربيات مطابقة للبحث.</div>';return;}
+  grid.innerHTML=rows.map(({c,i})=>{
+    const m=salesMeta(c), status=m.reserved?'محجوزة':'متاحة';
+    const expected=m.expected||0, agreed=m.agreed||0;
+    const canEdit=tnHas('edit'), manager=tnIsManager();
+    return `<div class="sale-card ${m.reserved?'reserved':''}">
+      <h3>${esc(c['العربية']||'')} ${c['السنة']?`— ${esc(c['السنة'])}`:''}</h3>
+      <div class="sale-meta"><span class="tag">${esc(c['الموديل']||'')}</span><span class="tag ${m.reserved?'warn':'ok'} sale-status ${m.reserved?'reserved':'available'}">${status}</span></div>
+      <div class="label">سعر البيع المتوقع</div>${manager?`<div class="sale-agreed"><div><input id="expected_${c.id}" type="number" min="0" step="1" inputmode="numeric" value="${expected||''}" placeholder="السعر المتوقع للبيع"></div><button class="btn" onclick="saveSalesExpected(${Number(c.id)})">💾 حفظ</button></div>`:`<div class="sale-price">${expected?money(expected):'غير محدد'}</div>`}
+      <div class="sale-agreed"><div><label class="label">تم الاتفاق بسعر</label><input id="agreed_${c.id}" type="number" min="0" step="1" inputmode="numeric" value="${agreed||''}" placeholder="اكتب السعر المتفق عليه" ${canEdit?'':'disabled'}></div><button class="btn" onclick="saveSalesAgreement(${Number(c.id)})" ${canEdit?'':'disabled'}>💾 حفظ</button></div>
+      ${m.reserved?`<button class="btn" onclick="toggleSalesReservation(${Number(c.id)},false)" ${canEdit?'':'disabled'}>إلغاء الحجز</button>`:`<button class="btn primary" onclick="toggleSalesReservation(${Number(c.id)},true)" ${canEdit?'':'disabled'}>🔒 تم الحجز</button>`}
+      ${manager?`<button class="btn primary" onclick="completeReservedSale(${Number(c.id)})">💰 إتمام البيع (المدير)</button>`:''}
+    </div>`;
+  }).join('');
+}
+function saveSalesExpected(carId){
+  if(!tnIsManager())return alert('المدير فقط يقدر يحدد السعر المتوقع للبيع.');
+  const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
+  const input=document.getElementById('expected_'+carId); const expected=roundWhole(input?.value||0);
+  const m=salesMeta(c); m.expected=Math.max(0,expected); setSalesMeta(c,m); save(); renderSalesPage();
+  if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتوقع للبيع';
+}
+function saveSalesAgreement(carId){
+  if(!tnHas('edit'))return alert('ليس لديك صلاحية تعديل بيانات المبيعات.');
+  const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
+  const input=document.getElementById('agreed_'+carId); const agreed=roundWhole(input?.value||0);
+  const m=salesMeta(c); m.agreed=Math.max(0,agreed); setSalesMeta(c,m); save(); renderSalesPage();
+  if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتفق عليه';
+}
+function toggleSalesReservation(carId,flag){
+  if(!tnHas('edit'))return alert('ليس لديك صلاحية تعديل حالة الحجز.');
+  const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
+  const input=document.getElementById('agreed_'+carId); const agreed=roundWhole(input?.value||0);
+  if(flag && agreed<=0)return alert('اكتب السعر المتفق عليه أولاً ثم اضغط «تم الحجز».');
+  const m=salesMeta(c); m.agreed=agreed||m.agreed; m.reserved=!!flag; setSalesMeta(c,m); save(); renderSalesPage();
+  if(typeof sysStatus!=='undefined')sysStatus.textContent=flag?'تم حجز العربية':'تم إلغاء الحجز';
+}
+function completeReservedSale(carId){
+  if(!tnIsManager())return alert('المدير فقط يقدر يتمم البيع من النظام.');
+  const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c||sold(c))return alert('العربية غير متاحة للبيع.');
+  const m=salesMeta(c); saleModal(carId,m.agreed||m.expected||0);
+}
+function renderAll(){renderDash();renderSalesPage();renderCars();renderRequests();renderPartners();renderActiveContribTable();table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();if(typeof renderShowroomDashboard==='function')renderShowroomDashboard();renderEmployees();const __fin=financialCashBalances();cashCurrent.textContent=money(__fin.book);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
 const fields={
 car:[['العربية','text'],['الموديل','number'],['سعر الشراء','number'],['عمولة الشراء','number'],['دفع من الخزنة؟','select','نعم|لا'],['مصدر العربية / المورد','text'],['رقم المورد','text'],['اسم العميل المشتري','text'],['رقم تليفون العميل','text'],['حالة البيع','select','لم تُسجل بيانات البيع بعد|تم الحجز|مباعة'],['سعر البيع','number'],['عمولة البيع','number'],['صافي الربح الحقيقي','number'],['ثلث المعرض','number'],['ثلثان للشركاء','number'],['ملاحظات','textarea']],
 request:[['التاريخ','date'],['اسم العميل','text'],['رقم التليفون','text'],['السيارة المطلوبة','text'],['الموديل','number'],['الميزانية','number'],['كاش/تقسيط','select','كاش|تقسيط'],['المقدم','number'],['اللون','text'],['الحالة','select','جديد|تم التواصل|بانتظار عربية|تم توفير عربية|تم البيع|مغلق'],['مسؤول الطلب','text'],['ملاحظات','textarea']],
@@ -1150,10 +1223,11 @@ function resetSaleDistribution(){
   if(typeof showroomActualProfit!=='undefined' && showroomActualProfit){showroomActualProfit.value='';delete showroomActualProfit.dataset.manual;}
   if(typeof partnersActualProfit!=='undefined' && partnersActualProfit){partnersActualProfit.value='';}
 }
-function saleModal(){
+function saleModal(carId=null,prefillSell=0){
   let a=A('العربيات').map((c,i)=>({c,i})).filter(x=>!sold(x.c));
   sc.innerHTML=a.map(x=>`<option value="${x.i}">${esc(cname(x.c))} — ${esc(cmodel(x.c))} — شراء ${money(x.c['سعر الشراء'])}</option>`).join('')||'<option value="">لا توجد عربيات</option>';
-  sp.value=''; scom.value=0; sb.value=''; sphone.value=''; snotes.value='';
+  if(carId!=null){const idx=a.findIndex(x=>Number(x.c.id)===Number(carId));if(idx>=0)sc.value=String(a[idx].i);}
+  sp.value=prefillSell?String(roundWhole(prefillSell)):''; scom.value=0; sb.value=''; sphone.value=''; snotes.value='';
   resetSaleDistribution();
   if(saleProfitPreview)saleProfitPreview.innerHTML='أدخل سعر البيع لعرض صافي الربح والتوزيع.';
   if(partnerProfitInputs){partnerProfitInputs.style.display='none';if(partnerProfitRows)partnerProfitRows.innerHTML='';}
@@ -1186,7 +1260,7 @@ function saveSale(){
   inputs.forEach(e=>{const v=Math.max(0,roundWhole(e.value));e.value=String(v);amounts[e.dataset.partner]=v;sum+=v;});
   if(inputs.length&&sum!==pool)return alert(`إجمالي أرباح الشركاء يجب أن يساوي ${money(pool)} ج.م بالضبط. الحالي ${money(sum)} ج.م`);
   try{distributeSaleProfit(c,p,showroom,amounts)}catch(e){return alert(e.message||e)}
-  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;c['ملاحظات']=snotes.value;
+  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;c['ملاحظات']=snotes.value; const __sm=salesMeta(c); __sm.reserved=false; __sm.agreed=0; __sm.expected=__sm.expected||0; setSalesMeta(c,__sm); c['ملاحظات']=String(snotes.value||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED)=/.test(x)).join('\n');
   const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً','car_id':Number(c.id)});
   save();closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع';alert('تم تسجيل البيع وتحديث المخزون والربح والخزنة');
 }
