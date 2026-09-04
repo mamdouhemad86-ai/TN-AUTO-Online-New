@@ -564,7 +564,7 @@ function openSecurityPassword(){if(!tnIsManager())return alert('المدير ف�
 const TN_PERM_LABELS={dash:'لوحة التحكم',cars:'المخزون والعربيات',requests:'طلبات العملاء',partners:'الشركاء',contrib:'مساهمات العربيات',cash:'الخزنة',moves:'حركة الشركاء',refunds:'مبالغ تسترد',profits:'الأرباح',employees:'الموظفين',reports:'التقارير',showroom:'المعرض',add:'إضافة',edit:'تعديل',delete:'حذف',print:'الطباعة',finance:'العمليات المالية'};
 async function openEmployeeSecurityForm(id){if(!tnIsManager())return alert('المدير فقط يقدر يعدل صلاحيات الموظفين.');const st=tnSecurityLoad(),old=st.employees.find(e=>e.id===id);const name=prompt('اسم الموظف:',old?.name||'');if(!name)return;const phone=prompt('رقم الهاتف (اختياري):',old?.phone||'')||'';let pass='';if(!old){pass=prompt('باسورد الموظف (6 أحرف أو أرقام على الأقل):')||'';if(pass.length<6)return alert('الباسورد لازم يكون 6 أحرف أو أرقام على الأقل.')}else{const np=prompt('باسورد جديد؟ اتركه فارغًا للإبقاء على القديم:')||'';if(np&&np.length<6)return alert('الباسورد لازم يكون 6 أحرف أو أرقام على الأقل.');if(np)pass=np}const active=confirm('هل الموظف نشط؟');const permissions={};Object.keys(TN_PERM_LABELS).forEach(k=>permissions[k]=confirm('السماح بـ: '+TN_PERM_LABELS[k]));const obj={id:old?.id||('empsec_'+Date.now()),name,phone,active,permissions};if(pass)obj.passwordHash=await tnHash(pass);if(old)st.employees=st.employees.map(e=>e.id===old.id?{...e,...obj}:e);else st.employees.push(obj);tnSecuritySave(st);renderSecurityPage();alert(old?'تم تعديل صلاحيات الموظف.':'تم إنشاء الموظف وصلاحياته.')}
 function deleteSecurityEmployee(id){if(!tnIsManager())return;if(!confirm('حذف حساب الصلاحيات هذا؟'))return;const st=tnSecurityLoad();st.employees=st.employees.filter(e=>e.id!==id);tnSecuritySave(st);renderSecurityPage()}
-async function tnLogout(){try{if(sb)await sb.auth.signOut()}catch(e){console.error('Logout error',e)}window.__tnRole=null;window.__tnEmployeeId=null;location.reload()}
+async function tnLogout(){try{localStorage.setItem('TN_AUTO_FORCE_LOGIN','1');if(sb){try{await sb.auth.signOut({scope:'global'})}catch(e){try{await sb.auth.signOut()}catch(_){}}}for(const k of Object.keys(localStorage)){if(k.startsWith('sb-')&&k.includes('-auth-token'))localStorage.removeItem(k)}}catch(e){console.error('Logout error',e)}window.__tnRole=null;window.__tnEmployeeId=null;location.reload()}
 function tnApplyPermissions(){const manager=tnIsManager();document.querySelectorAll('.nav button').forEach(b=>{const p=b.dataset.p;if(p==='settings')b.style.display=manager?'':'none';else b.style.display=tnHas(p)?'':'none'});document.querySelectorAll('[onclick]').forEach(el=>{const x=String(el.getAttribute('onclick')||'');let key=null;if(/\b(del|deleteSecurityEmployee)\s*\(/.test(x))key='delete';else if(/printCurrentReport/.test(x))key='print';else if(/showroom(Withdraw|Deposit|Expense)|withdrawModal|additionalDepositModal|saveCash|cashModal/.test(x))key='finance';else if(/modal\(/.test(x)&&/primary/.test(el.className))key='add';if(key&& !tnHas(key))el.style.display='none'});if(document.getElementById('settings')&&!tnHas('settings'))document.getElementById('settings').classList.add('hidden')}
 function printCurrentReport(){
   const showroomOut=document.getElementById('showroomReportOutput');
@@ -1211,6 +1211,7 @@ document.addEventListener('click',function(e){const el=e.target.closest('[onclic
 
   const style = document.createElement('style');
   style.textContent = `
+    body.tn-auth-locked > *:not(#tn-login-screen){visibility:hidden!important;}
     #tn-login-screen {
       position: fixed;
       inset: 0;
@@ -1284,16 +1285,20 @@ document.addEventListener('click',function(e){const el=e.target.closest('[onclic
   refreshRoles();
   roleSel.addEventListener('change',()=>{const isMgr=roleSel.value==='manager';document.getElementById('tn-login-email').style.display=isMgr?'':'none';});
 
+  document.body.classList.add('tn-auth-locked');
   document.body.appendChild(screen);
 
   // لا نعتمد على جلسة Supabase القديمة لتجاوز شاشة الدخول.
   // كل تسجيل خروج يعيد طلب كلمة المرور فعليًا، مع بقاء بيانات النظام في Supabase/localStorage.
   async function checkLogin() {
     try {
-      if (sb) await sb.auth.getSession();
-    } catch (e) {
-      console.error(e);
-    }
+      const forced=localStorage.getItem('TN_AUTO_FORCE_LOGIN')==='1';
+      const {data}=sb ? await sb.auth.getSession() : {data:{session:null}};
+      if(!forced && data && data.session){
+        window.__tnRole='manager'; window.__tnEmployeeId=null;
+        screen.remove(); document.body.classList.remove('tn-auth-locked'); tnApplyPermissions();
+      }
+    } catch (e) { console.error(e); }
   }
 
   document.getElementById('tn-login-btn').addEventListener('click', async function () {
@@ -1317,11 +1322,11 @@ document.addEventListener('click',function(e){const el=e.target.closest('[onclic
         const emp=tnSecurityLoad().employees.find(e=>e.id===role&&e.active!==false);
         const hash=await tnHash(password);
         if(!emp||hash!==emp.passwordHash)throw new Error('Employee login failed');
-        window.__tnRole='employee'; window.__tnEmployeeId=emp.id; screen.remove(); tnApplyPermissions(); return;
+        window.__tnRole='employee'; window.__tnEmployeeId=emp.id; localStorage.removeItem('TN_AUTO_FORCE_LOGIN'); screen.remove(); document.body.classList.remove('tn-auth-locked'); tnApplyPermissions(); return;
       }
       const { data, error } = await sb.auth.signInWithPassword({email: LOGIN_EMAIL,password: password});
       if (error || !data.session) throw error || new Error('Login failed');
-      window.__tnRole='manager'; window.__tnEmployeeId=null; screen.remove(); tnApplyPermissions();
+      window.__tnRole='manager'; window.__tnEmployeeId=null; localStorage.removeItem('TN_AUTO_FORCE_LOGIN'); screen.remove(); document.body.classList.remove('tn-auth-locked'); tnApplyPermissions();
     } catch (e) {
       errorBox.textContent = 'كلمة المرور غير صحيحة';
       errorBox.style.display = 'block';
