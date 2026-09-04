@@ -567,6 +567,7 @@ function renderProfits(){
 }
 const TN_SECURITY_KEY='TN_AUTO_SECURITY_V1';
 const TN_PRINT_KEY='TN_AUTO_PRINT_SETTINGS_V1';
+const TN_PERM_LABELS={dash:'لوحة التحكم',cars:'العربيات والمخزون',requests:'طلبات العملاء',partners:'الشركاء',contrib:'مساهمات العربيات',cash:'الخزنة',moves:'حركة الشركاء',refunds:'مبالغ تسترد',profits:'الأرباح',employees:'الموظفين',reports:'التقارير',showroom:'المعرض',settings:'الإعدادات والصلاحيات',add:'إضافة',edit:'تعديل',delete:'حذف',print:'طباعة',finance:'الحركات المالية'};
 const TN_DEFAULT_PERMS={dash:true,cars:true,requests:true,partners:true,contrib:true,cash:true,moves:true,refunds:true,profits:true,employees:true,reports:true,showroom:true,settings:false,add:true,edit:true,delete:false,print:true,finance:true};
 function tnSecurityLoad(){try{return JSON.parse(localStorage.getItem(TN_SECURITY_KEY)||'null')||{employees:[],managerLabel:'المدير'}}catch{return {employees:[],managerLabel:'المدير'}}}
 function tnSecuritySave(x){localStorage.setItem(TN_SECURITY_KEY,JSON.stringify(x))}
@@ -590,6 +591,31 @@ function tnSecurityNormalize(){
 function tnEmployeeSecurity(employeeId){
   const st=tnSecurityNormalize();
   return st.employees.find(x=>String(x.employeeId)===String(employeeId))||null;
+}
+async function openSecurityPassword(){
+  if(!tnIsManager())return alert('المدير فقط يقدر يغير باسورد المدير.');
+  const existing=document.getElementById('tnManagerPasswordModal'); if(existing)existing.remove();
+  const m=document.createElement('div'); m.id='tnManagerPasswordModal'; m.className='modal';
+  m.innerHTML=`<div class="modalbox" style="max-width:520px"><div class="modalhead"><h2>🔐 تغيير باسورد المدير</h2><button class="btn" onclick="document.getElementById('tnManagerPasswordModal')?.remove()">إغلاق</button></div><div class="form"><div class="field span2"><label>الباسورد الجديد</label><input id="tnManagerPass1" type="password" minlength="6" placeholder="6 أحرف أو أرقام على الأقل"></div><div class="field span2"><label>تأكيد الباسورد</label><input id="tnManagerPass2" type="password" minlength="6"></div></div><br><button class="btn primary" onclick="saveManagerPassword()">💾 حفظ الباسورد</button></div>`;
+  document.body.appendChild(m);
+}
+async function saveManagerPassword(){
+  if(!tnIsManager())return alert('المدير فقط يقدر يغير باسورد المدير.');
+  const p1=String(document.getElementById('tnManagerPass1')?.value||''),p2=String(document.getElementById('tnManagerPass2')?.value||'');
+  if(p1.length<6)return alert('الباسورد لازم يكون 6 أحرف أو أرقام على الأقل.');
+  if(p1!==p2)return alert('تأكيد الباسورد غير مطابق.');
+  if(!sb)return alert('الاتصال بقاعدة البيانات غير متاح.');
+  try{const {error}=await sb.auth.updateUser({password:p1});if(error)throw error;document.getElementById('tnManagerPasswordModal')?.remove();alert('تم تغيير باسورد المدير بنجاح.');}
+  catch(e){alert('لم يتم تغيير الباسورد.\n\n'+(e.message||e));}
+}
+function savePrintSettings(){
+  if(!tnIsManager())return alert('المدير فقط يقدر يعدل إعدادات الطباعة.');
+  const d={company:document.getElementById('printCompanyName')?.value||'EL TAWFIK TN AUTO',fontSize:document.getElementById('printFontSize')?.value||'12',paper:document.getElementById('printPaper')?.value||'A4',showLogo:document.getElementById('printShowLogo')?.value||'yes',showDate:document.getElementById('printShowDate')?.value||'yes',showFooter:document.getElementById('printShowFooter')?.value||'yes'};
+  localStorage.setItem(TN_PRINT_KEY,JSON.stringify(d)); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ إعدادات الطباعة ✓'; alert('تم حفظ إعدادات الطباعة.');
+}
+function tnLogout(){
+  localStorage.setItem('TN_AUTO_FORCE_LOGIN','1'); window.__tnRole=null; window.__tnEmployeeId=null;
+  if(sb&&sb.auth)sb.auth.signOut().catch(()=>{}); location.reload();
 }
 function renderSecurityPage(){
   const d=tnPrintLoad();
