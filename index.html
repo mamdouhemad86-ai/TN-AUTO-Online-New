@@ -795,13 +795,15 @@ function salesMeta(c){
   const raw=String(c?.['ملاحظات']||'');
   const get=(k)=>{const m=raw.match(new RegExp('(?:^|\n)'+k+'=([^\n]*)'));return m?m[1].trim():''};
   const clean=(v)=>String(v||'').replace(/,/g,'');
-  return {expected:Math.max(0,roundWhole(clean(get('__TN_EXPECTED_SALE__'))),),agreed:Math.max(0,roundWhole(clean(get('__TN_AGREED_SALE__')))),reserved:get('__TN_RESERVED__')==='1'};
+  return {expected:Math.max(0,roundWhole(clean(get('__TN_EXPECTED_SALE__'))),),agreed:Math.max(0,roundWhole(clean(get('__TN_AGREED_SALE__')))),reserved:get('__TN_RESERVED__')==='1',customer:get('__TN_CUSTOMER__'),phone:get('__TN_CUSTOMER_PHONE__')};
 }
 function setSalesMeta(c,meta){
-  const raw=String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED)=/.test(x));
+  const raw=String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED|CUSTOMER|CUSTOMER_PHONE)=/.test(x));
   if(Number(meta.expected)>0)raw.push('__TN_EXPECTED_SALE__='+roundWhole(meta.expected));
   if(Number(meta.agreed)>0)raw.push('__TN_AGREED_SALE__='+roundWhole(meta.agreed));
   if(meta.reserved)raw.push('__TN_RESERVED__=1');
+  if(String(meta.customer||'').trim())raw.push('__TN_CUSTOMER__='+String(meta.customer).trim());
+  if(String(meta.phone||'').trim())raw.push('__TN_CUSTOMER_PHONE__='+String(meta.phone).trim());
   c['ملاحظات']=raw.join('\n');
 }
 function vehicleSalesInfo(c){
@@ -819,7 +821,7 @@ function setVehicleSalesInfo(c,info){
   c['ملاحظات']=raw.join('\n');
 }
 function cleanSalesNotes(c){
-  return String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED|COLOR|MILEAGE|TRAFFIC|LICENSE)=/.test(x)).join('\n');
+  return String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED|CUSTOMER|CUSTOMER_PHONE|COLOR|MILEAGE|TRAFFIC|LICENSE)=/.test(x)).join('\n');
 }
 function renderSalesPage(){
   const grid=document.getElementById('salesGrid'); if(!grid)return;
@@ -844,6 +846,7 @@ function renderSalesPage(){
       <div class="sale-meta"><span class="tag">${esc(c['الموديل']||'')}</span><span class="tag">🎨 ${esc(v.color||'اللون غير محدد')}</span><span class="tag">🛣️ ${mileage}</span><span class="tag">🚦 ${esc(v.traffic||'المرور غير محدد')}</span><span class="tag">📄 ${esc(v.license||'الرخصة غير محددة')}</span><span class="tag ${m.reserved?'warn':'ok'} sale-status ${m.reserved?'reserved':'available'}">${status}</span></div>
       <div class="label">سعر البيع المتوقع</div>${manager?`<div class="sale-agreed"><div><input id="expected_${c.id}" type="number" min="0" step="1" inputmode="numeric" value="${expected||''}" placeholder="السعر المتوقع للبيع"></div><button class="btn" onclick="saveSalesExpected(${Number(c.id)})">💾 حفظ</button></div>`:`<div class="sale-price">${expected?money(expected):'غير محدد'}</div>`}
       <div class="sale-agreed"><div><label class="label">تم الاتفاق بسعر</label><input id="agreed_${c.id}" type="number" min="0" step="1" inputmode="numeric" value="${agreed||''}" placeholder="اكتب السعر المتفق عليه" ${canEdit?'':'disabled'}></div><button class="btn" onclick="saveSalesAgreement(${Number(c.id)})" ${canEdit?'':'disabled'}>💾 حفظ</button></div>
+      ${m.reserved?`<div class="sale-customer"><div>👤 العميل: <b>${esc(m.customer||'غير محدد')}</b></div><div>📞 التواصل: <b>${esc(m.phone||'غير محدد')}</b></div></div>`:`<div class="sale-customer"><input id="customer_${c.id}" class="search" placeholder="اسم العميل الحاجز" value="${esc(m.customer||'')}" ${canEdit?'':'disabled'}><input id="phone_${c.id}" class="search" inputmode="tel" placeholder="رقم التواصل" value="${esc(m.phone||'')}" ${canEdit?'':'disabled'}></div>`}
       ${m.reserved?`<button class="btn" onclick="toggleSalesReservation(${Number(c.id)},false)" ${canEdit?'':'disabled'}>إلغاء الحجز</button>`:`<button class="btn primary" onclick="toggleSalesReservation(${Number(c.id)},true)" ${canEdit?'':'disabled'}>🔒 تم الحجز</button>`}
       ${manager?`<button class="btn primary" onclick="completeReservedSale(${Number(c.id)})">💰 إتمام البيع (المدير)</button>`:''}
     </div>`;
@@ -868,7 +871,11 @@ function toggleSalesReservation(carId,flag){
   const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
   const input=document.getElementById('agreed_'+carId); const agreed=roundWhole(input?.value||0);
   if(flag && agreed<=0)return alert('اكتب السعر المتفق عليه أولاً ثم اضغط «تم الحجز».');
-  const m=salesMeta(c); m.agreed=agreed||m.agreed; m.reserved=!!flag; setSalesMeta(c,m); save(); renderSalesPage();
+  const customer=document.getElementById('customer_'+carId)?.value?.trim()||'';
+  const phone=document.getElementById('phone_'+carId)?.value?.trim()||'';
+  if(flag && !customer)return alert('اكتب اسم العميل الحاجز أولاً.');
+  if(flag && !phone)return alert('اكتب رقم التواصل أولاً.');
+  const m=salesMeta(c); m.agreed=agreed||m.agreed; m.reserved=!!flag; m.customer=flag?customer:''; m.phone=flag?phone:''; setSalesMeta(c,m); save(); renderSalesPage();
   if(typeof sysStatus!=='undefined')sysStatus.textContent=flag?'تم حجز العربية':'تم إلغاء الحجز';
 }
 function completeReservedSale(carId){
@@ -1279,7 +1286,7 @@ function saveSale(){
   inputs.forEach(e=>{const v=Math.max(0,roundWhole(e.value));e.value=String(v);amounts[e.dataset.partner]=v;sum+=v;});
   if(inputs.length&&sum!==pool)return alert(`إجمالي أرباح الشركاء يجب أن يساوي ${money(pool)} ج.م بالضبط. الحالي ${money(sum)} ج.م`);
   try{distributeSaleProfit(c,p,showroom,amounts)}catch(e){return alert(e.message||e)}
-  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;c['ملاحظات']=snotes.value; const __sm=salesMeta(c); __sm.reserved=false; __sm.agreed=0; __sm.expected=__sm.expected||0; setSalesMeta(c,__sm); c['ملاحظات']=String(snotes.value||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED)=/.test(x)).join('\n');
+  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;c['ملاحظات']=snotes.value; const __sm=salesMeta(c); __sm.reserved=false; __sm.agreed=0; __sm.expected=__sm.expected||0; setSalesMeta(c,__sm); c['ملاحظات']=String(snotes.value||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED|CUSTOMER|CUSTOMER_PHONE)=/.test(x)).join('\n');
   const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً','car_id':Number(c.id)});
   save();closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع';alert('تم تسجيل البيع وتحديث المخزون والربح والخزنة');
 }
