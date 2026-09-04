@@ -804,8 +804,22 @@ function setSalesMeta(c,meta){
   if(meta.reserved)raw.push('__TN_RESERVED__=1');
   c['ملاحظات']=raw.join('\n');
 }
+function vehicleSalesInfo(c){
+  const raw=String(c?.['ملاحظات']||'');
+  const get=(k)=>{const m=raw.match(new RegExp('(?:^|\\n)'+k+'=([^\\n]*)'));return m?m[1].trim():''};
+  const mileage=String(get('__TN_MILEAGE__')).replace(/,/g,'');
+  return {color:get('__TN_COLOR__'),mileage:mileage?Number(mileage):0,traffic:get('__TN_TRAFFIC__'),license:get('__TN_LICENSE__')};
+}
+function setVehicleSalesInfo(c,info){
+  const raw=String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(COLOR|MILEAGE|TRAFFIC|LICENSE)=/.test(x));
+  if(String(info.color||'').trim())raw.push('__TN_COLOR__='+String(info.color).trim());
+  if(Number(info.mileage)>0)raw.push('__TN_MILEAGE__='+Math.round(Number(info.mileage)));
+  if(String(info.traffic||'').trim())raw.push('__TN_TRAFFIC__='+String(info.traffic).trim());
+  if(String(info.license||'').trim())raw.push('__TN_LICENSE__='+String(info.license).trim());
+  c['ملاحظات']=raw.join('\n');
+}
 function cleanSalesNotes(c){
-  return String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED)=/.test(x)).join('\n');
+  return String(c?.['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED|COLOR|MILEAGE|TRAFFIC|LICENSE)=/.test(x)).join('\n');
 }
 function renderSalesPage(){
   const grid=document.getElementById('salesGrid'); if(!grid)return;
@@ -821,12 +835,13 @@ function renderSalesPage(){
   if(av)av.textContent=(active.length-reservedCount)+' متاح'; if(rc)rc.textContent=reservedCount+' محجوز';
   if(!rows.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1">لا توجد عربيات مطابقة للبحث.</div>';return;}
   grid.innerHTML=rows.map(({c,i})=>{
-    const m=salesMeta(c), status=m.reserved?'محجوزة':'متاحة';
+    const m=salesMeta(c), v=vehicleSalesInfo(c), status=m.reserved?'محجوزة':'متاحة';
     const expected=m.expected||0, agreed=m.agreed||0;
     const canEdit=tnHas('edit'), manager=tnIsManager();
+    const mileage=v.mileage?Number(v.mileage).toLocaleString('en-US')+' كم':'غير محدد';
     return `<div class="sale-card ${m.reserved?'reserved':''}">
       <h3>${esc(c['العربية']||'')} ${c['السنة']?`— ${esc(c['السنة'])}`:''}</h3>
-      <div class="sale-meta"><span class="tag">${esc(c['الموديل']||'')}</span><span class="tag ${m.reserved?'warn':'ok'} sale-status ${m.reserved?'reserved':'available'}">${status}</span></div>
+      <div class="sale-meta"><span class="tag">${esc(c['الموديل']||'')}</span><span class="tag">🎨 ${esc(v.color||'اللون غير محدد')}</span><span class="tag">🛣️ ${mileage}</span><span class="tag">🚦 ${esc(v.traffic||'المرور غير محدد')}</span><span class="tag">📄 ${esc(v.license||'الرخصة غير محددة')}</span><span class="tag ${m.reserved?'warn':'ok'} sale-status ${m.reserved?'reserved':'available'}">${status}</span></div>
       <div class="label">سعر البيع المتوقع</div>${manager?`<div class="sale-agreed"><div><input id="expected_${c.id}" type="number" min="0" step="1" inputmode="numeric" value="${expected||''}" placeholder="السعر المتوقع للبيع"></div><button class="btn" onclick="saveSalesExpected(${Number(c.id)})">💾 حفظ</button></div>`:`<div class="sale-price">${expected?money(expected):'غير محدد'}</div>`}
       <div class="sale-agreed"><div><label class="label">تم الاتفاق بسعر</label><input id="agreed_${c.id}" type="number" min="0" step="1" inputmode="numeric" value="${agreed||''}" placeholder="اكتب السعر المتفق عليه" ${canEdit?'':'disabled'}></div><button class="btn" onclick="saveSalesAgreement(${Number(c.id)})" ${canEdit?'':'disabled'}>💾 حفظ</button></div>
       ${m.reserved?`<button class="btn" onclick="toggleSalesReservation(${Number(c.id)},false)" ${canEdit?'':'disabled'}>إلغاء الحجز</button>`:`<button class="btn primary" onclick="toggleSalesReservation(${Number(c.id)},true)" ${canEdit?'':'disabled'}>🔒 تم الحجز</button>`}
@@ -863,7 +878,7 @@ function completeReservedSale(carId){
 }
 function renderAll(){renderDash();renderSalesPage();renderCars();renderRequests();renderPartners();renderActiveContribTable();table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();if(typeof renderShowroomDashboard==='function')renderShowroomDashboard();renderEmployees();const __fin=financialCashBalances();cashCurrent.textContent=money(__fin.book);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
 const fields={
-car:[['العربية','text'],['الموديل','number'],['سعر الشراء','number'],['عمولة الشراء','number'],['دفع من الخزنة؟','select','نعم|لا'],['مصدر العربية / المورد','text'],['رقم المورد','text'],['اسم العميل المشتري','text'],['رقم تليفون العميل','text'],['حالة البيع','select','لم تُسجل بيانات البيع بعد|تم الحجز|مباعة'],['سعر البيع','number'],['عمولة البيع','number'],['صافي الربح الحقيقي','number'],['ثلث المعرض','number'],['ثلثان للشركاء','number'],['ملاحظات','textarea']],
+car:[['العربية','text'],['الموديل','number'],['السنة','number'],['اللون','text'],['العداد','number'],['المرور','text'],['الرخصة','text'],['سعر الشراء','number'],['عمولة الشراء','number'],['دفع من الخزنة؟','select','نعم|لا'],['مصدر العربية / المورد','text'],['رقم المورد','text'],['اسم العميل المشتري','text'],['رقم تليفون العميل','text'],['حالة البيع','select','لم تُسجل بيانات البيع بعد|تم الحجز|مباعة'],['سعر البيع','number'],['عمولة البيع','number'],['صافي الربح الحقيقي','number'],['ثلث المعرض','number'],['ثلثان للشركاء','number'],['ملاحظات','textarea']],
 request:[['التاريخ','date'],['اسم العميل','text'],['رقم التليفون','text'],['السيارة المطلوبة','text'],['الموديل','number'],['الميزانية','number'],['كاش/تقسيط','select','كاش|تقسيط'],['المقدم','number'],['اللون','text'],['الحالة','select','جديد|تم التواصل|بانتظار عربية|تم توفير عربية|تم البيع|مغلق'],['مسؤول الطلب','text'],['ملاحظات','textarea']],
 partner:[['الشريك','text'],['إجمالي المبلغ المسجل','number'],['الموزع على العربيات','number'],['غير موزع','number']],
 contrib:[['العربية','text'],['هبه','number'],['ممدوح','number'],['كريم','number'],['رامي','number'],['عمرو','number'],['شيرين','number'],['هيثم وعلي','number']],
@@ -873,7 +888,7 @@ employee:[['الموظف','text'],['الوظيفة','text'],['رقم الهات�
 employee_tx:[['الموظف','select',''],['التاريخ','date'],['نوع الحركة','select','راتب|سلفة|حافز|جزاء'],['المبلغ','number'],['البيان','text']]
 };
 let ctx=null;
-function modal(type,data=null,index=null,sheet=null){ctx={type,index,sheet:sheet||({car:'العربيات',request:'طلبات العملاء',partner:'الشركاء',contrib:'مساهمات العربيات',move:'حركة الشركاء',refund:'مبالغ تسترد',employee:'الموظفين',employee_tx:'حركة الموظفين'}[type])};let fs=fields[type];mt.textContent=(data?'تعديل ':'إضافة ')+type;mf.innerHTML='<div class="form">'+fs.map(([l,t,o])=>{let v=data?.[l]??'';let el=t==='select'?`<select id="f_${l}">${o.split('|').map(x=>`<option ${String(v)===x?'selected':''}>${x}</option>`).join('')}</select>`:t==='textarea'?`<textarea id="f_${l}">${esc(v)}</textarea>`:`<input id="f_${l}" type="${t}" value="${esc(v)}">`;return `<div class="field ${t==='textarea'?'span3':''}"><label>${esc(l)}</label>${el}</div>`}).join('')+'</div><br><button class="btn primary" onclick="saveModal()">حفظ</button>';modalbox.classList.remove('hidden');
+function modal(type,data=null,index=null,sheet=null){ctx={type,index,sheet:sheet||({car:'العربيات',request:'طلبات العملاء',partner:'الشركاء',contrib:'مساهمات العربيات',move:'حركة الشركاء',refund:'مبالغ تسترد',employee:'الموظفين',employee_tx:'حركة الموظفين'}[type])};let fs=fields[type];if(type==='car'&&data){const vi=vehicleSalesInfo(data);data={...data,'اللون':vi.color,'العداد':vi.mileage||'','المرور':vi.traffic,'الرخصة':vi.license};}mt.textContent=(data?'تعديل ':'إضافة ')+type;mf.innerHTML='<div class="form">'+fs.map(([l,t,o])=>{let v=data?.[l]??'';let el=t==='select'?`<select id="f_${l}">${o.split('|').map(x=>`<option ${String(v)===x?'selected':''}>${x}</option>`).join('')}</select>`:t==='textarea'?`<textarea id="f_${l}">${esc(v)}</textarea>`:`<input id="f_${l}" type="${t}" value="${esc(v)}">`;return `<div class="field ${t==='textarea'?'span3':''}"><label>${esc(l)}</label>${el}</div>`}).join('')+'</div><br><button class="btn primary" onclick="saveModal()">حفظ</button>';modalbox.classList.remove('hidden');
  if(type==='employee_tx'){ const sel=document.getElementById('f_الموظف'); const selected=data?.['الموظف']||''; sel.innerHTML=A('الموظفين').map(e=>`<option ${String(e['الموظف'])===String(selected)?'selected':''}>${esc(e['الموظف'])}</option>`).join(''); }
  if(type==='employee_tx'){ const es=document.getElementById('f_نوع_الحركة'), ea=document.getElementById('f_المبلغ'), ed=document.getElementById('f_التاريخ'), ep=document.getElementById('f_الموظف'); const refresh=()=>{ const emp=A('الموظفين').find(e=>String(e['الموظف'])===String(ep.value)); const ym=String(ed.value||new Date().toISOString().slice(0,10)).slice(0,7); if(es.value==='راتب'&&emp){ea.value=String(employeeMonthStats(emp,ym).due);ea.readOnly=true;ea.title='يُحسب تلقائيًا بعد السلف والحوافز والجزاءات والدفعات السابقة';}else{ea.readOnly=false;ea.title='';} }; es.addEventListener('change',refresh); ep.addEventListener('change',refresh); ed.addEventListener('change',refresh); refresh(); }
  if(!data&&['request','move','employee_tx'].includes(type))document.getElementById('f_التاريخ').value=new Date().toISOString().slice(0,10);
@@ -912,6 +927,10 @@ async function saveModal(){
  const purchase=Number(obj['سعر الشراء'])||0,total=pcs.reduce((a,x)=>a+x.amount,0);
  if(pcs.length && Math.abs(total-purchase)>0.01){alert('إجمالي مساهمات الشركاء لازم يساوي سعر الشراء.\nسعر الشراء: '+money(purchase)+'\nالمساهمات: '+money(total));return;}
  obj['مساهمات الشركاء']=pcs.map(x=>x.name+': '+x.amount).join(' | ');
+ const oldVehicle=A('العربيات')[ctx.index];
+ const vi={color:obj['اللون']||'',mileage:Number(obj['العداد'])||0,traffic:obj['المرور']||'',license:obj['الرخصة']||''};
+ if(oldVehicle&&String(oldVehicle['ملاحظات']||'').includes('__TN_')){ /* preserve other internal sales markers while replacing vehicle info */ }
+ setVehicleSalesInfo(obj,vi);
 }
  if(ctx.type==='car'){
    const pcs=[...document.querySelectorAll('.pc')].map(x=>({name:x.dataset.partner,amount:Number(x.value)||0})).filter(x=>x.amount>0);
