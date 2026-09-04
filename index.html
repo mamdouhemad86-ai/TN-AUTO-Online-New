@@ -831,6 +831,34 @@ async function saveModal(){
  }
  if(ctx.type==='employee' && !obj['الموظف']) return alert('اكتب اسم الموظف');
  if(ctx.type==='employee_tx' && (!obj['الموظف'] || !(Number(obj['المبلغ'])>0))) return alert('اختار الموظف واكتب مبلغ صحيح');
+ // الموظفون: حفظ مباشر في Supabase بدل الاعتماد على المزامنة المؤجلة فقط.
+ // هذا يمنع اختفاء الموظف بعد Refresh، ولا يلمس أي حسابات أو أرصدة.
+ if(ctx.type==='employee'){
+   if(isNew){
+     if(!obj.id)obj.id=nextLocalId('الموظفين');
+     a.push(obj);
+   }else{
+     obj.id=obj.id||a[ctx.index]?.id||nextLocalId('الموظفين');
+     a[ctx.index]=obj;
+   }
+   save(false);
+   closeModal(); renderAll();
+   if(onlineMode && sb){
+     try{
+       const payload={id:Number(obj.id),name:String(obj['الموظف']||''),job_title:obj['الوظيفة']||null,phone:obj['رقم الهاتف']||null,monthly_salary:Number(obj['الراتب الشهري'])||0,hire_date:obj['تاريخ التعيين']||null,status:obj['الحالة']==='غير نشط'?'inactive':'active',notes:obj['ملاحظات']||null};
+       const {data:cloudRow,error}=await sb.from('employees').upsert(payload,{onConflict:'id'}).select().single();
+       if(error) throw error;
+       if(cloudRow?.id!=null)obj.id=cloudRow.id;
+       save(false); renderEmployees(); renderSecurityPage?.();
+       if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ الموظف أونلاين ✓';
+     }catch(e){
+       console.error('Employee cloud save error',e);
+       if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ الموظف أونلاين';
+       alert('الموظف اتسجل على الجهاز، لكن لم يتم حفظه أونلاين.\n\n'+(e.message||e));
+     }
+   }else if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ الموظف على الجهاز';
+   return;
+ }
  if(isNew){ if(ctx.type==='car' && !obj.id)obj.id=nextLocalId('العربيات'); a.push(obj); }else{ obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet); a[ctx.index]=obj; }
  if(ctx.type==='employee_tx' && isNew){
    const employee=A('الموظفين').find(e=>String(e['الموظف'])===String(obj['الموظف'])); if(!employee)return alert('الموظف غير موجود');
