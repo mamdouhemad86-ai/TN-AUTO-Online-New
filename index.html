@@ -1621,8 +1621,13 @@ document.addEventListener('click',function(e){const el=e.target.closest('[onclic
   // كل تسجيل خروج يعيد طلب كلمة المرور فعليًا، مع بقاء بيانات النظام في Supabase/localStorage.
   async function checkLogin() {
     try {
-      const active=sessionStorage.getItem('TN_AUTO_ACTIVE_SESSION')==='1';
-      if(active){const role=sessionStorage.getItem('TN_AUTO_ROLE')||'manager';const empId=sessionStorage.getItem('TN_AUTO_EMPLOYEE_ID')||null;if(role==='employee'&&empId){const emp=tnSecurityLoad().employees.find(e=>String(e.id)===String(empId)&&e.active!==false);if(emp){window.__tnRole='employee';window.__tnEmployeeId=emp.id;screen.remove();document.body.classList.remove('tn-auth-locked');tnApplyPermissions();return;}}if(role==='manager'){window.__tnRole='manager';window.__tnEmployeeId=null;screen.remove();document.body.classList.remove('tn-auth-locked');tnApplyPermissions();}}
+      // إجبار شاشة الدخول عند كل فتح/إعادة تحميل للصفحة.
+      // لا نعتمد على sessionStorage أو جلسة Supabase لتجاوز الباسورد.
+      sessionStorage.removeItem('TN_AUTO_ACTIVE_SESSION');
+      sessionStorage.removeItem('TN_AUTO_ROLE');
+      sessionStorage.removeItem('TN_AUTO_EMPLOYEE_ID');
+      window.__tnRole=null;
+      window.__tnEmployeeId=null;
     } catch (e) { console.error(e); }
   }
 
