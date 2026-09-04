@@ -200,6 +200,20 @@ async function syncLocalToCloud(){
   if(!onlineMode)return;
   if(typeof sysStatus!=='undefined')sysStatus.textContent='جاري الحفظ أونلاين...';
 
+  // Prevent a stale device from deleting employees created on another device.
+  if(sb && !__employeeCloudWriteBusy){
+    try{
+      const {data:cloudEmployees,error:empErr}=await sb.from('employees').select('*').order('id',{ascending:true});
+      if(!empErr && Array.isArray(cloudEmployees)){
+        const local=A('الموظفين');
+        const cloudRows=cloudEmployees.map(e=>({id:e.id,'الموظف':e.name||'','الوظيفة':e.job_title||'','رقم الهاتف':e.phone||'','الراتب الشهري':Number(e.monthly_salary)||0,'تاريخ التعيين':e.hire_date||'','الحالة':e.status==='inactive'?'غير نشط':'نشط','ملاحظات':e.notes||''}));
+        const cloudIds=new Set(cloudRows.map(x=>String(x.id)));
+        const localOnly=local.filter(x=>x?.id!=null && !cloudIds.has(String(x.id)));
+        S['الموظفين']=cloudRows.concat(localOnly);
+      }
+    }catch(e){ console.warn('Employee cloud pre-sync read failed:',e); }
+  }
+
   // The existing UI uses Arabic sheet-shaped objects, so only map the
   // core tables here; the remaining UI stays local until its DB mapping
   // is finalized.
@@ -307,6 +321,7 @@ const SUPABASE_URL = 'https://swwiuunjpgdrsjvwlupo.supabase.co/';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_THtY-2aMTfpN9HcODht2OA_c585IK2U';
 let sb = null;
 let onlineMode = false;
+let __employeeCloudWriteBusy = false;
 
 function initOnline(){
   try{
@@ -834,33 +849,38 @@ async function saveModal(){
  // الموظفون: حفظ مباشر في Supabase بدل الاعتماد على المزامنة المؤجلة فقط.
  // هذا يمنع اختفاء الموظف بعد Refresh، ولا يلمس أي حسابات أو أرصدة.
  if(ctx.type==='employee'){
-   // الموظف لازم يتحفظ في Supabase أولاً، وبعد نجاح الحفظ فقط نثبت نسخة الشاشة.
-   // لا نستخدم ID محلي قد يتعارض مع ID موجود على السحابة.
+   // Save to Supabase first; only then update the local screen.
+   // New rows do not get a local ID because Supabase owns the employee ID.
    const payload={name:String(obj['الموظف']||''),job_title:obj['الوظيفة']||null,phone:obj['رقم الهاتف']||null,monthly_salary:Number(obj['الراتب الشهري'])||0,hire_date:obj['تاريخ التعيين']||null,status:obj['الحالة']==='غير نشط'?'inactive':'active',notes:obj['ملاحظات']||null};
    try{
      if(onlineMode && sb){
-       let cloudRow, error;
+       const {data:sessionData,error:sessionErr}=await sb.auth.getSession();
+       if(sessionErr) throw sessionErr;
+       if(!sessionData?.session) throw new Error('جلسة المدير غير موجودة. اعمل تسجيل دخول للمدير ثم جرّب الحفظ.');
+       __employeeCloudWriteBusy=true;
+       let cloudRow,error;
        if(isNew){
-         ({data:cloudRow,error}=await sb.from('employees').insert(payload).select().single());
+         ({data:cloudRow,error}=await sb.from('employees').insert(payload).select('*').single());
        }else{
          const existingId=Number(obj.id||a[ctx.index]?.id);
          if(!Number.isFinite(existingId)) throw new Error('معرّف الموظف غير صحيح');
-         ({data:cloudRow,error}=await sb.from('employees').update(payload).eq('id',existingId).select().single());
+         ({data:cloudRow,error}=await sb.from('employees').update(payload).eq('id',existingId).select('*').single());
        }
        if(error) throw error;
-       if(!cloudRow) throw new Error('لم ترجع قاعدة البيانات الموظف بعد الحفظ');
-       obj.id=cloudRow.id;
-       if(isNew) a.push(obj); else a[ctx.index]=obj;
+       if(!cloudRow) throw new Error('قاعدة البيانات لم تُرجع الموظف بعد الحفظ.');
+       const savedObj={...obj,id:cloudRow.id,'الموظف':cloudRow.name||obj['الموظف'],'الوظيفة':cloudRow.job_title||'','رقم الهاتف':cloudRow.phone||'','الراتب الشهري':Number(cloudRow.monthly_salary)||0,'تاريخ التعيين':cloudRow.hire_date||'','الحالة':cloudRow.status==='inactive'?'غير نشط':'نشط','ملاحظات':cloudRow.notes||''};
+       if(isNew) a.push(savedObj); else a[ctx.index]=savedObj;
        save(false); closeModal(); renderAll(); renderEmployees(); if(typeof renderSecurityPage==='function')renderSecurityPage();
        if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ الموظف أونلاين ✓';
+       __employeeCloudWriteBusy=false;
        return;
      }
-     // وضع محلي فقط
      obj.id=obj.id||a[ctx.index]?.id||nextLocalId('الموظفين');
      if(isNew)a.push(obj);else a[ctx.index]=obj;
      save(false); closeModal(); renderAll();
      if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ الموظف على الجهاز';
    }catch(e){
+     __employeeCloudWriteBusy=false;
      console.error('Employee cloud save error',e);
      if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ الموظف أونلاين';
      alert('لم يتم حفظ الموظف.\n\n'+(e.message||e));
