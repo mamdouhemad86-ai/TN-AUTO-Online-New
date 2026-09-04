@@ -1294,6 +1294,41 @@ function showroomProfitTotals(){
   const total=earned+deposited+employeeNet;
   return {earned,deposited,withdrawn,employeeNet,total,remaining:total-withdrawn};
 }
+function renderShowroomReport(){
+  const out=document.getElementById('showroomReportOutput'); if(!out)return;
+  const t=showroomProfitTotals();
+  const soldCars=A('العربيات').filter(c=>sold(c));
+  const showroomRows=soldCars.map(c=>{
+    const sale=roundWhole(c['سعر البيع']);
+    const purchase=roundWhole(c['سعر الشراء']);
+    const purchaseCom=roundWhole(c['عمولة الشراء']);
+    const saleCom=roundWhole(c['عمولة البيع']);
+    const realProfit=roundWhole(c['صافي الربح الحقيقي']||sale-purchase-purchaseCom-saleCom);
+    const partnerProfit=A('حركة الشركاء').filter(x=>String(x['نوع الحركة'])==='ربح'&&Number(x.car_id)===Number(c.id)).reduce((n,x)=>n+Math.max(0,roundWhole(x['المبلغ']||x['ربح من العربيات'])),0);
+    const showroomProfit=Math.max(0,realProfit-partnerProfit);
+    return {c,sale,purchase,purchaseCom,saleCom,realProfit,partnerProfit,showroomProfit};
+  });
+  const cashMoves=A('حركة الخزنة').filter(x=>{
+    const note=String(x['ملاحظات']||''), type=String(x['نوع الحركة']||'');
+    return note.includes('[SHOWROOM-') || ['إيداع كاش من المعرض','سحب ربح المعرض','مصاريف المعرض','راتب موظف','سلفة موظف','مكافأة موظف','خصم موظف'].includes(type);
+  });
+  const employeeMoves=A('حركة الموظفين').filter(x=>['راتب','سلفة','مكافأة','مصروف','خصم'].includes(String(x['نوع الحركة']||'')));
+  const salesHtml=showroomRows.map(r=>`<tr><td>${esc(r.c['العربية']||'')}</td><td>${money(r.purchase)}</td><td>${money(r.sale)}</td><td>${money(r.purchaseCom+r.saleCom)}</td><td>${money(r.realProfit)}</td><td>${money(r.partnerProfit)}</td><td><b>${money(r.showroomProfit)}</b></td></tr>`).join('')||'<tr><td colspan="7" class="empty">لا توجد عربيات مباعة</td></tr>';
+  const movesHtml=cashMoves.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${esc(x['العربية/البند']||'')}</td><td>${money(x['داخل'])}</td><td>${money(x['خارج'])}</td><td>${esc(x['ملاحظات']||'')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">لا توجد حركات معرض مسجلة</td></tr>';
+  const empHtml=employeeMoves.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['الموظف']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${money(x['المبلغ'])}</td><td>${esc(x['البيان']||'')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">لا توجد حركات موظفين</td></tr>';
+  out.dataset.reportTitle='تقرير المعرض';
+  out.innerHTML=`
+    <div class="grid" style="margin-bottom:14px">
+      <div class="panel"><div class="label">ربح المعرض من العربيات المباعة</div><h2>${money(t.earned)} ج.م</h2></div>
+      <div class="panel"><div class="label">إيداعات كاش من المعرض</div><h2>${money(t.deposited)} ج.م</h2></div>
+      <div class="panel"><div class="label">تأثير حركات الموظفين</div><h2>${money(t.employeeNet)} ج.م</h2></div>
+      <div class="panel"><div class="label">المسحوب من رصيد المعرض</div><h2>${money(t.withdrawn)} ج.م</h2></div>
+    </div>
+    <div class="panel" style="margin-bottom:14px"><h3>ملخص رصيد المعرض</h3><div class="note">إجمالي رصيد المعرض: <b>${money(t.total)} ج.م</b> — المتبقي بعد السحب: <b>${money(t.remaining)} ج.م</b></div></div>
+    <div class="panel" style="margin-bottom:14px"><h3>ربح المعرض من العربيات المباعة</h3><div class="tablewrap"><table class="table"><thead><tr><th>العربية</th><th>سعر الشراء</th><th>سعر البيع</th><th>العمولات</th><th>صافي الربح الحقيقي</th><th>ربح الشركاء</th><th>ربح المعرض</th></tr></thead><tbody>${salesHtml}</tbody></table></div></div>
+    <div class="panel" style="margin-bottom:14px"><h3>حركات المعرض المرتبطة بالخزنة</h3><div class="tablewrap"><table class="table"><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>البيان</th><th>داخل</th><th>خارج</th><th>ملاحظات</th></tr></thead><tbody>${movesHtml}</tbody></table></div></div>
+    <div class="panel"><h3>حركات الموظفين المؤثرة على حساب المعرض</h3><div class="tablewrap"><table class="table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الحركة</th><th>المبلغ</th><th>البيان</th></tr></thead><tbody>${empHtml}</tbody></table></div></div>`;
+}
 function renderShowroomWithdrawSummary(){
   const el=document.getElementById('showroomWithdrawSummary'); if(!el)return;
   const t=showroomProfitTotals();
