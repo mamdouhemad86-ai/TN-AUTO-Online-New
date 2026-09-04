@@ -1016,7 +1016,37 @@ async function del(s,i){
     for(const r of A('مساهمات العربيات')){if(Object.prototype.hasOwnProperty.call(r,name))r[name]=0;}
     A('حركة الشركاء').splice(0,A('حركة الشركاء').length,...A('حركة الشركاء').filter(x=>x['الشريك']!==name));
   }
-  if(s==='الموظفين'&&row){ const name=String(row['الموظف']||''); if(!confirm(`حذف الموظف ${name} وحركاته؟`))return; A('حركة الموظفين').splice(0,A('حركة الموظفين').length,...A('حركة الموظفين').filter(x=>String(x['الموظف'])!==name)); }
+  if(s==='الموظفين'&&row){
+    const name=String(row['الموظف']||''), employeeId=Number(row.id);
+    if(!confirm(`حذف الموظف ${name} وحركاته؟`))return;
+    // Employee deletion is handled directly in Supabase first so the row cannot
+    // come back after Refresh or from another device. Delete child transactions
+    // first, then the employee. Security/login record is removed by employee ID.
+    if(onlineMode && sb){
+      try{
+        if(!Number.isFinite(employeeId)) throw new Error('معرّف الموظف غير صحيح');
+        const {error:txErr}=await sb.from('employee_transactions').delete().eq('employee_id',employeeId);
+        if(txErr) throw txErr;
+        const {error:empErr}=await sb.from('employees').delete().eq('id',employeeId);
+        if(empErr) throw empErr;
+        // Remove local employee movements belonging to this employee.
+        A('حركة الموظفين').splice(0,A('حركة الموظفين').length,...A('حركة الموظفين').filter(x=>String(x['الموظف'])!==name));
+        A('الموظفين').splice(i,1);
+        // Remove the local login/security profile by employee ID as well.
+        try{const st=tnSecurityNormalize();st.employees=st.employees.filter(x=>String(x.employeeId)!==String(employeeId));tnSecuritySaveAndRender(st);}catch(e){console.warn('security cleanup',e);}
+        save(false); renderAll();
+        if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حذف الموظف أونلاين وتسجيل دخوله';
+        alert('تم حذف الموظف من السحابة وتسجيل الدخول والصلاحيات المرتبطة به.');
+      }catch(e){
+        console.error('delete employee cloud error',e);
+        alert('لم يتم حذف الموظف أونلاين.\n\n'+(e.message||e));
+      }
+      return;
+    }
+    A('حركة الموظفين').splice(0,A('حركة الموظفين').length,...A('حركة الموظفين').filter(x=>String(x['الموظف'])!==name));
+    A('الموظفين').splice(i,1);
+    try{const st=tnSecurityNormalize();st.employees=st.employees.filter(x=>String(x.employeeId)!==String(employeeId));tnSecuritySaveAndRender(st);}catch(e){console.warn('security cleanup',e);}
+  }
   if(s==='حركة الموظفين'&&row){ const name=String(row['الموظف']||''), amt=Number(row['المبلغ'])||0, date=String(row['التاريخ']||''), typeMap={'راتب':'راتب موظف','سلفة':'سلفة موظف','مكافأة':'مكافأة موظف','خصم':'خصم موظف'}; const cash=A('حركة الخزنة'); for(let j=cash.length-1;j>=0;j--){const x=cash[j]; if(String(x['العربية/البند']||'')===name && String(x['التاريخ']||'')===date && Number(x['المبلغ'])===amt && String(x['نوع الحركة']||'')===typeMap[row['نوع الحركة']]){cash.splice(j,1);break;}} }
   if(s==='طلبات العملاء'&&row){
     if(onlineMode){
