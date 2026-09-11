@@ -417,26 +417,6 @@ function initOnline(){
 .sales-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.sale-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:14px;box-shadow:0 2px 8px rgba(16,24,40,.04)}.sale-card h3{margin:0 0 6px;font-size:17px}.sale-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.sale-price{font-size:20px;font-weight:800;margin:10px 0}.sale-agreed{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:10px}.sale-agreed input{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px}.sale-card .btn{margin-top:8px}.sale-card.reserved{border-width:2px}.sale-status{font-weight:800}.sale-status.available{color:#067647}.sale-status.reserved{color:#b54708}@media(max-width:1000px){.sales-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.sales-grid{grid-template-columns:1fr}.sale-agreed{grid-template-columns:1fr}.sale-card .btn{width:100%}}
 </style>
 
-<style>
-/* TN print fix: print only the temporary report sheet */
-@media print {
-  body.print-mode > *:not(.report-print-sheet) {
-    display: none !important;
-  }
-  body.print-mode .report-print-sheet {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #fff !important;
-    color: #000 !important;
-  }
-}
-@media screen {
-  .report-print-sheet { display: none; }
-}
-</style>
 </head><body>
 
 <button class="mobile-menu-btn" type="button" aria-label="فتح القائمة" onclick="toggleMobileNav()">☰</button>
@@ -701,28 +681,95 @@ function deleteSecurityEmployee(id){
   const st=tnSecurityNormalize(); st.employees=st.employees.filter(e=>String(e.id)!==String(id)); tnSecuritySaveAndRender(st);
 }
 function tnApplyPermissions(){const manager=tnIsManager();document.querySelectorAll('.nav button').forEach(b=>{const p=b.dataset.p;if(p==='settings')b.style.display=manager?'':'none';else b.style.display=tnHas(p)?'':'none'});document.querySelectorAll('[onclick]').forEach(el=>{const x=String(el.getAttribute('onclick')||'');let key=null;if(/\b(del|deleteSecurityEmployee)\s*\(/.test(x))key='delete';else if(/printCurrentReport/.test(x))key='print';else if(/showroom(Withdraw|Deposit|Expense)|withdrawModal|additionalDepositModal|saveCash|cashModal/.test(x))key='finance';else if(/modal\(/.test(x)&&/primary/.test(el.className))key='add';if(key&& !tnHas(key))el.style.display='none'});if(document.getElementById('settings')&&!tnHas('settings'))document.getElementById('settings').classList.add('hidden')}
-function printCurrentReport() {
-  const report = document.querySelector('.report-container, .report-content, .report-print, #report, .print-report');
-  if (!report) {
-    window.print();
+function printCurrentReport(){
+  const showroomOut=document.getElementById('showroomReportOutput');
+  const showroomPage=document.getElementById('showroom');
+  const report=(showroomPage&&!showroomPage.classList.contains('hidden')&&showroomOut)
+    ? showroomOut
+    : document.getElementById('reportOutput');
+
+  if(!report){
+    alert('لا يوجد تقرير للطباعة');
     return;
   }
 
-  // Never replace document.body.innerHTML: doing so destroys navigation/event handlers.
-  const sheet = document.createElement('div');
-  sheet.className = 'report-print-sheet';
-  sheet.innerHTML = report.outerHTML;
-  document.body.appendChild(sheet);
-  document.body.classList.add('print-mode');
+  const clone=report.cloneNode(true);
+  clone.querySelectorAll('.toolbar,.btn,.actions,.footer,.note,.system-note,.print-hide').forEach(el=>el.remove());
 
-  const cleanup = () => {
-    document.body.classList.remove('print-mode');
-    sheet.remove();
-    window.removeEventListener('afterprint', cleanup);
+  const detail=clone.querySelector('#partnerDetailBody');
+  if(detail) clone.innerHTML=detail.innerHTML;
+
+  const selected=document.getElementById('partnerDetailSelect');
+  const reportTitle=selected
+    ? ('كشف شريك تفصيلي - '+(selected.options[selected.selectedIndex]?.text||''))
+    : (showroomPage&&!showroomPage.classList.contains('hidden')
+      ? 'تقرير المعرض'
+      : (report.dataset.reportTitle||'تقرير TN Auto'));
+
+  const ps=tnPrintLoad();
+  const logoTop=ps.showLogo==='yes'
+    ? '<img src="data:image/png;base64,LOGO_DATA" alt="TN AUTO">'
+    : '';
+  const logoFoot=ps.showLogo==='yes'
+    ? '<img src="data:image/png;base64,LOGO_DATA" alt="TN AUTO">'
+    : '';
+  const dateLine=ps.showDate==='yes'
+    ? `<div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('en-GB')}</div>`
+    : '';
+  const footer=ps.showFooter==='yes'
+    ? `<div class="report-print-footer">${logoFoot}<div class="company">${esc(ps.company)}</div></div>`
+    : '';
+
+  const reportHTML=`<div class="report-print-sheet" style="font-size:${esc(ps.fontSize)}px">
+    <div class="report-print-header">${logoTop}<div class="company">${esc(ps.company)}</div><div class="title">${esc(reportTitle)}</div>${dateLine}</div>
+    <div class="report-print-body">${clone.innerHTML}</div>
+    ${footer}
+  </div>`;
+
+  // افتح نافذة طباعة مستقلة. ده أكثر ثباتاً من تغيير body أو الاعتماد على
+  // @media print داخل الصفحة الرئيسية، وبيمنع كسر السيستم بعد الطباعة.
+  const printWin=window.open('', '_blank', 'width=1000,height=800');
+  if(!printWin){
+    alert('المتصفح منع نافذة الطباعة. اسمح بالنوافذ المنبثقة للموقع ثم اضغط طباعة مرة أخرى.');
+    return;
+  }
+
+  const styles=Array.from(document.querySelectorAll('style'))
+    .map(s=>s.outerHTML).join('\n');
+
+  printWin.document.open();
+  printWin.document.write(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>${esc(reportTitle)}</title>
+${styles}
+<style>
+  @page{size:${ps.paper==='A5'?'A5':'A4'} portrait;margin:5mm 6mm}
+  html,body{background:#fff!important;color:#000!important;margin:0!important;padding:0!important}
+  body{font-family:Tahoma,Arial,sans-serif;direction:rtl}
+  .report-print-sheet{display:block!important;position:relative!important;width:100%!important;box-sizing:border-box!important}
+  .report-print-header{text-align:center}
+  .report-print-body{display:block!important;overflow:visible!important;height:auto!important;max-height:none!important}
+  .report-print-footer{display:block!important}
+  .toolbar,.btn,.actions,.footer,.note,.system-note,.print-hide{display:none!important}
+</style>
+</head>
+<body>${reportHTML.replaceAll('LOGO_DATA','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')}</body>
+</html>`);
+  printWin.document.close();
+
+  const doPrint=()=>{
+    try{
+      printWin.focus();
+      printWin.print();
+    }catch(e){
+      alert('تعذر فتح الطباعة: '+e.message);
+    }
   };
 
-  window.addEventListener('afterprint', cleanup);
-  setTimeout(() => window.print(), 50);
+  if(printWin.document.readyState==='complete') setTimeout(doPrint,250);
+  else printWin.onload=()=>setTimeout(doPrint,250);
 }
 function renderReport(type){
   const out=document.getElementById('reportOutput'); if(!out)return;
