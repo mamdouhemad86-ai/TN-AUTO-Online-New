@@ -38,6 +38,25 @@
 
 
 #tnEmployeeSecurityModal .perm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}#tnEmployeeSecurityModal .perm-item{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:9px;padding:10px;background:#fff}#tnEmployeeSecurityModal .perm-item input{width:18px;height:18px}@media(max-width:700px){#tnEmployeeSecurityModal .perm-grid{grid-template-columns:1fr}}
+
+@media print{
+  @page{size:A4 portrait;margin:6mm}
+  html,body{height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;color:#000!important}
+  body.print-mode>.side,body.print-mode>.main{display:none!important}
+  body.print-mode>.report-print-sheet{
+    display:block!important;
+    position:static!important;
+    width:100%!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    font-family:Tahoma,Arial,sans-serif;
+  }
+  body.print-mode>.report-print-sheet *{overflow:visible!important;max-height:none!important}
+  body.print-mode>.report-print-sheet .report-print-body{height:auto!important;max-height:none!important;overflow:visible!important}
+  body.print-mode>.report-print-sheet .tablewrap{overflow:visible!important;max-height:none!important}
+  body.print-mode>.report-print-sheet .report-print-footer{display:none!important}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">function realCashBalance(){const capital=A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0)+A('حركة الشركاء').reduce((s,x)=>{const t=String(x['نوع الحركة']);return s+(t==='إضافة'?(Number(x['المبلغ'])||0):(t==='سحب'?-(Number(x['المبلغ'])||0):0));},0);const carsValue=A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0);const outstanding=A('المبالغ المستردة').reduce((s,x)=>s+(Number(x['المبلغ'])||0)-(Number(x['المسترد'])||0),0);return capital-carsValue-outstanding;}</script>
 
@@ -441,8 +460,8 @@ function initOnline(){
 <section id="moves" class="page hidden"><div class="panel"><h2>حركة الشركاء</h2><div class="toolbar"><button class="btn primary" onclick="withdrawModal()">💸 سحب شريك</button><button class="btn" onclick="showroomWithdrawModal()">🏢 سحب ربح المعرض</button><button class="btn" onclick="modal('move')">➕ حركة أخرى</button></div><div class="tablewrap"><table class="table"><thead id="mh"></thead><tbody id="mb"></tbody></table></div></div></section>
 <section id="refunds" class="page hidden"><div class="panel"><h2>مبالغ تسترد</h2><div class="toolbar"><button class="btn primary" onclick="modal('refund')">➕ إضافة</button></div><div class="tablewrap"><table class="table"><thead id="rh"></thead><tbody id="rb"></tbody></table></div></div></section>
 <section id="profits" class="page hidden"><div class="panel" style="margin-bottom:14px"><div class="toolbar"><button class="btn primary" onclick="showroomWithdrawModal()">🏢 سحب ربح المعرض</button><button class="btn" onclick="showroomDepositModal()">🏢 إيداع كاش من المعرض</button></div><div id="showroomWithdrawSummary" class="note">—</div></div><div class="grid"><div class="panel"><h2>أرباح الشركاء</h2><div class="tablewrap"><table class="table"><thead id="prh"></thead><tbody id="prb"></tbody></table></div></div><div class="panel"><h2>ربح المعرض</h2><div class="tablewrap"><table class="table"><thead id="showh"></thead><tbody id="showb"></tbody></table></div></div></div></section>
-<section id="employees" class="page hidden"><div class="panel"><h2>الموظفين</h2><div class="toolbar"><button class="btn primary" onclick="modal('employee')">➕ موظف جديد</button><button class="btn" onclick="modal('employee_tx')">💰 حركة موظف</button><button class="btn" onclick="show('settings')">🔐 دخول وصلاحيات</button></div><div class="tablewrap"><table class="table"><thead id="eh"></thead><tbody id="eb"></tbody></table></div></div><div class="panel" style="margin-top:14px"><h3>كشف رواتب الشهر الحالي</h3><div id="payrollSummary" class="tablewrap"></div></div><div class="panel" style="margin-top:14px"><h3>حركة الموظفين</h3><div class="tablewrap"><table class="table"><thead id="eth"></thead><tbody id="etb"></tbody></table></div></div></section><section id="reports" class="page hidden"><div class="panel"><h2>التقارير</h2><div class="toolbar"><button class="btn" onclick="renderReport('sales')">المبيعات</button><button class="btn" onclick="renderReport('stock')">المخزون</button><button class="btn" onclick="renderReport('customers')">العملاء</button><button class="btn" onclick="renderReport('partners')">الشركاء</button><button class="btn primary" onclick="renderPartnerDetailReport()">كشف شريك تفصيلي</button><button class="btn" onclick="renderReport('cash')">الخزنة</button><button class="btn" onclick="renderReport('employees')">الموظفين</button><button class="btn" onclick="renderReport('employee_tx')">حركة الموظفين</button><button class="btn primary" data-tn-print="1">🖨️ طباعة التقرير</button></div><div id="reportOutput"><div class="empty">اختار نوع التقرير</div></div></div></section>
-<section id="settings" class="page hidden"><div class="settings-grid"><div class="panel"><h2>⚙️ الإعدادات والصلاحيات</h2><p class="label">إدارة كلمات المرور والموظفين والصلاحيات وإعدادات الطباعة.</p><div class="toolbar"><button class="btn primary" onclick="openSecurityPassword()">🔐 تغيير باسورد المدير</button><button class="logout-btn" onclick="tnLogout()">تسجيل خروج</button></div><div class="danger-note">الحسابات والأرصدة والمعادلات الموجودة في النظام لا يتم تعديلها من هذه الصفحة.</div></div><div class="panel"><h3 class="settings-section-title">🖨️ إعدادات الطباعة</h3><div class="form"><div class="field"><label>اسم المعرض في الطباعة</label><input id="printCompanyName" type="text"></div><div class="field"><label>حجم الخط</label><select id="printFontSize"><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option></select></div><div class="field"><label>حجم الورق</label><select id="printPaper"><option value="A4">A4</option><option value="A5">A5</option></select></div><div class="field"><label>إظهار اللوجو</label><select id="printShowLogo"><option value="yes">نعم</option><option value="no">لا</option></select></div><div class="field"><label>إظهار التاريخ</label><select id="printShowDate"><option value="yes">نعم</option><option value="no">لا</option></select></div><div class="field"><label>إظهار تذييل التقرير</label><select id="printShowFooter"><option value="yes">نعم</option><option value="no">لا</option></select></div></div><br><button class="btn primary" onclick="savePrintSettings()">💾 حفظ إعدادات الطباعة</button></div></div><div class="panel" style="margin-top:14px"><h3>👤 الموظفون والصلاحيات</h3><p class="label">الموظفون هنا هم نفس الموظفين الموجودين في قسم «الموظفين» — لا يتم إنشاء موظف مكرر.</p><div class="tablewrap"><table class="table"><thead><tr><th>الموظف</th><th>الوظيفة</th><th>حالة الدخول</th><th>الصلاحيات</th><th>إجراء</th></tr></thead><tbody id="securityEmployeesBody"></tbody></table></div></div><div class="panel" style="margin-top:14px"><h3>👤 الموظف الحالي</h3><div id="securityCurrentUser" class="alert ok">المدير</div></div></section><section id="showroom" class="page hidden"><div class="grid"><div class="panel"><h2>🏢 حساب المعرض</h2><div id="showroomBalanceCard" class="alert ok">رصيد المعرض: <b>0 ج.م</b></div><div id="showroomBreakdown" class="note">—</div><div class="toolbar" style="margin-top:12px"><button class="btn primary" onclick="showroomExpenseModal()">💸 دفع مصاريف المعرض</button><button class="btn" onclick="showroomDepositModal()">🏢 إيداع كاش من المعرض</button><button class="btn" onclick="showroomWithdrawModal()">💰 سحب من رصيد المعرض</button></div></div><div class="panel"><h2>ملخص المعرض</h2><div id="showroomMiniReport">—</div></div></div><div class="panel" style="margin-top:14px"><h3>تقرير المعرض</h3><div class="toolbar"><button class="btn" onclick="renderShowroomReport()">🔄 تحديث التقرير</button><button class="btn primary" data-tn-print="1">🖨️ طباعة التقرير</button></div><div id="showroomReportOutput"><div class="empty">اضغط تحديث التقرير</div></div></div></section>
+<section id="employees" class="page hidden"><div class="panel"><h2>الموظفين</h2><div class="toolbar"><button class="btn primary" onclick="modal('employee')">➕ موظف جديد</button><button class="btn" onclick="modal('employee_tx')">💰 حركة موظف</button><button class="btn" onclick="show('settings')">🔐 دخول وصلاحيات</button></div><div class="tablewrap"><table class="table"><thead id="eh"></thead><tbody id="eb"></tbody></table></div></div><div class="panel" style="margin-top:14px"><h3>كشف رواتب الشهر الحالي</h3><div id="payrollSummary" class="tablewrap"></div></div><div class="panel" style="margin-top:14px"><h3>حركة الموظفين</h3><div class="tablewrap"><table class="table"><thead id="eth"></thead><tbody id="etb"></tbody></table></div></div></section><section id="reports" class="page hidden"><div class="panel"><h2>التقارير</h2><div class="toolbar"><button class="btn" onclick="renderReport('sales')">المبيعات</button><button class="btn" onclick="renderReport('stock')">المخزون</button><button class="btn" onclick="renderReport('customers')">العملاء</button><button class="btn" onclick="renderReport('partners')">الشركاء</button><button class="btn primary" onclick="renderPartnerDetailReport()">كشف شريك تفصيلي</button><button class="btn" onclick="renderReport('cash')">الخزنة</button><button class="btn" onclick="renderReport('employees')">الموظفين</button><button class="btn" onclick="renderReport('employee_tx')">حركة الموظفين</button><button class="btn primary" onclick="printCurrentReport()">🖨️ طباعة التقرير</button></div><div id="reportOutput"><div class="empty">اختار نوع التقرير</div></div></div></section>
+<section id="settings" class="page hidden"><div class="settings-grid"><div class="panel"><h2>⚙️ الإعدادات والصلاحيات</h2><p class="label">إدارة كلمات المرور والموظفين والصلاحيات وإعدادات الطباعة.</p><div class="toolbar"><button class="btn primary" onclick="openSecurityPassword()">🔐 تغيير باسورد المدير</button><button class="logout-btn" onclick="tnLogout()">تسجيل خروج</button></div><div class="danger-note">الحسابات والأرصدة والمعادلات الموجودة في النظام لا يتم تعديلها من هذه الصفحة.</div></div><div class="panel"><h3 class="settings-section-title">🖨️ إعدادات الطباعة</h3><div class="form"><div class="field"><label>اسم المعرض في الطباعة</label><input id="printCompanyName" type="text"></div><div class="field"><label>حجم الخط</label><select id="printFontSize"><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option></select></div><div class="field"><label>حجم الورق</label><select id="printPaper"><option value="A4">A4</option><option value="A5">A5</option></select></div><div class="field"><label>إظهار اللوجو</label><select id="printShowLogo"><option value="yes">نعم</option><option value="no">لا</option></select></div><div class="field"><label>إظهار التاريخ</label><select id="printShowDate"><option value="yes">نعم</option><option value="no">لا</option></select></div><div class="field"><label>إظهار تذييل التقرير</label><select id="printShowFooter"><option value="yes">نعم</option><option value="no">لا</option></select></div></div><br><button class="btn primary" onclick="savePrintSettings()">💾 حفظ إعدادات الطباعة</button></div></div><div class="panel" style="margin-top:14px"><h3>👤 الموظفون والصلاحيات</h3><p class="label">الموظفون هنا هم نفس الموظفين الموجودين في قسم «الموظفين» — لا يتم إنشاء موظف مكرر.</p><div class="tablewrap"><table class="table"><thead><tr><th>الموظف</th><th>الوظيفة</th><th>حالة الدخول</th><th>الصلاحيات</th><th>إجراء</th></tr></thead><tbody id="securityEmployeesBody"></tbody></table></div></div><div class="panel" style="margin-top:14px"><h3>👤 الموظف الحالي</h3><div id="securityCurrentUser" class="alert ok">المدير</div></div></section><section id="showroom" class="page hidden"><div class="grid"><div class="panel"><h2>🏢 حساب المعرض</h2><div id="showroomBalanceCard" class="alert ok">رصيد المعرض: <b>0 ج.م</b></div><div id="showroomBreakdown" class="note">—</div><div class="toolbar" style="margin-top:12px"><button class="btn primary" onclick="showroomExpenseModal()">💸 دفع مصاريف المعرض</button><button class="btn" onclick="showroomDepositModal()">🏢 إيداع كاش من المعرض</button><button class="btn" onclick="showroomWithdrawModal()">💰 سحب من رصيد المعرض</button></div></div><div class="panel"><h2>ملخص المعرض</h2><div id="showroomMiniReport">—</div></div></div><div class="panel" style="margin-top:14px"><h3>تقرير المعرض</h3><div class="toolbar"><button class="btn" onclick="renderShowroomReport()">🔄 تحديث التقرير</button><button class="btn primary" onclick="printCurrentReport()">🖨️ طباعة التقرير</button></div><div id="showroomReportOutput"><div class="empty">اضغط تحديث التقرير</div></div></div></section>
 </main>
 
 <div id="modalbox" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2 id="mt"></h2><button class="btn" onclick="closeModal()">إغلاق</button></div><div id="mf"></div></div></div>
@@ -682,61 +701,54 @@ function deleteSecurityEmployee(id){
 }
 function tnApplyPermissions(){const manager=tnIsManager();document.querySelectorAll('.nav button').forEach(b=>{const p=b.dataset.p;if(p==='settings')b.style.display=manager?'':'none';else b.style.display=tnHas(p)?'':'none'});document.querySelectorAll('[onclick]').forEach(el=>{const x=String(el.getAttribute('onclick')||'');let key=null;if(/\b(del|deleteSecurityEmployee)\s*\(/.test(x))key='delete';else if(/showroom(Withdraw|Deposit|Expense)|withdrawModal|additionalDepositModal|saveCash|cashModal/.test(x))key='finance';else if(/modal\(/.test(x)&&/primary/.test(el.className))key='add';if(key&& !tnHas(key))el.style.display='none'});if(document.getElementById('settings')&&!tnHas('settings'))document.getElementById('settings').classList.add('hidden')}
 function printCurrentReport(){
-  try{
-    const showroomPage=document.getElementById('showroom');
-    const report=(showroomPage && !showroomPage.classList.contains('hidden'))
-      ? document.getElementById('showroomReportOutput')
-      : document.getElementById('reportOutput');
+  const showroomPage=document.getElementById('showroom');
+  const report=(showroomPage&&!showroomPage.classList.contains('hidden'))
+    ? document.getElementById('showroomReportOutput')
+    : document.getElementById('reportOutput');
 
-    if(!report){ alert('لا يوجد تقرير للطباعة'); return; }
-
-    const holder=document.createElement('div');
-    holder.id='tnPrintHolder';
-    const clone=report.cloneNode(true);
-    clone.querySelectorAll('.toolbar,.btn,.actions,.footer,.note,.system-note,.print-hide').forEach(el=>el.remove());
-
-    const selected=document.getElementById('partnerDetailSelect');
-    const title=selected
-      ? 'كشف شريك تفصيلي - '+(selected.options[selected.selectedIndex]?.text||'')
-      : (showroomPage && !showroomPage.classList.contains('hidden') ? 'تقرير المعرض' : 'تقرير TN AUTO');
-
-    const ps=tnPrintLoad();
-    holder.innerHTML=`<div class="report-print-sheet" dir="rtl">
-      <div class="report-print-header">
-        <div class="company">${esc(ps.company)}</div>
-        <div class="title">${esc(title)}</div>
-        ${ps.showDate==='yes'?`<div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('en-GB')}</div>`:''}
-      </div>
-      <div class="report-print-body">${clone.innerHTML}</div>
-      ${ps.showFooter==='yes'?`<div class="report-print-footer"><div class="company">${esc(ps.company)}</div></div>`:''}
-    </div>`;
-
-    document.body.classList.add('tn-printing-now');
-    document.body.appendChild(holder);
-
-    const style=document.createElement('style');
-    style.id='tn-print-v4-style';
-    style.textContent=`@media print{
-      @page{size:${ps.paper==='A5'?'A5':'A4'} portrait;margin:8mm}
-      body.tn-printing-now>*:not(#tnPrintHolder){display:none!important}
-      #tnPrintHolder{display:block!important;position:static!important;width:100%!important;height:auto!important;overflow:visible!important}
-      #tnPrintHolder *{visibility:visible!important;overflow:visible!important;max-height:none!important}
-      #tnPrintHolder .tablewrap{overflow:visible!important;max-height:none!important}
-      #tnPrintHolder .report-print-sheet{display:block!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important}
-      #tnPrintHolder .report-print-body{height:auto!important;max-height:none!important;overflow:visible!important}
-    }`;
-    document.head.appendChild(style);
-
-    const cleanup=()=>{
-      window.removeEventListener('afterprint',cleanup);
-      style.remove(); holder.remove(); document.body.classList.remove('tn-printing-now');
-    };
-    window.addEventListener('afterprint',cleanup);
-    setTimeout(()=>window.print(),200);
-  }catch(err){
-    console.error('TN PRINT ERROR',err);
-    alert('حصل خطأ في تشغيل الطباعة. افتح التقرير مرة أخرى وجرب.');
+  if(!report){
+    alert('لا يوجد تقرير للطباعة');
+    return;
   }
+
+  const clone=report.cloneNode(true);
+  clone.querySelectorAll('.toolbar,.btn,.actions,.footer,.note,.system-note,.print-hide,.report-print-footer')
+    .forEach(el=>el.remove());
+
+  const detail=clone.querySelector('#partnerDetailBody');
+  if(detail) clone.innerHTML=detail.innerHTML;
+
+  const selected=document.getElementById('partnerDetailSelect');
+  const reportTitle=selected
+    ? ('كشف شريك تفصيلي - '+(selected.options[selected.selectedIndex]?.text||''))
+    : (showroomPage&&!showroomPage.classList.contains('hidden')
+      ? 'تقرير المعرض'
+      : (report.dataset.reportTitle||'تقرير TN Auto'));
+
+  const ps=tnPrintLoad();
+  const sheet=document.createElement('div');
+  sheet.className='report-print-sheet';
+  sheet.dir='rtl';
+  sheet.innerHTML=`
+    <div class="report-print-header">
+      <div class="company">${esc(ps.company)}</div>
+      <div class="title">${esc(reportTitle)}</div>
+      ${ps.showDate==='yes'?`<div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('en-GB')}</div>`:''}
+    </div>
+    <div class="report-print-body">${clone.innerHTML}</div>
+  `;
+
+  document.body.appendChild(sheet);
+  document.body.classList.add('print-mode');
+
+  const cleanup=()=>{
+    window.removeEventListener('afterprint',cleanup);
+    if(sheet.parentNode) sheet.parentNode.removeChild(sheet);
+    document.body.classList.remove('print-mode');
+  };
+  window.addEventListener('afterprint',cleanup);
+
+  window.print();
 }
 function renderReport(type){
   const out=document.getElementById('reportOutput'); if(!out)return;
@@ -1535,17 +1547,6 @@ window.addEventListener('resize', function(){
   if (window.innerWidth > 700) closeMobileNav();
 });
 </script>
-
-
-document.addEventListener('DOMContentLoaded',function(){
-  document.querySelectorAll('[data-tn-print="1"]').forEach(function(btn){
-    btn.addEventListener('click',function(ev){
-      ev.preventDefault();
-      ev.stopPropagation();
-      printCurrentReport();
-    });
-  });
-});
 
 </body></html>
 <script>
