@@ -266,56 +266,59 @@ async function syncLocalToCloud(){
   const employeeMap=new Map(employees.map(e=>[e.name,e.id]));
   const employeeTx=A('حركة الموظفين').map((r,i)=>({id:Number(r.id)||i+1,employee_id:employeeMap.get(String(r['الموظف']))||null,type:({'راتب':'salary','سلفة':'advance','حافز':'bonus','جزاء':'deduction','مكافأة':'bonus','خصم':'deduction'})[r['نوع الحركة']]||'expense',amount:Number(r['المبلغ'])||0,transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10),description:r['البيان']||null})).filter(x=>x.employee_id&&x.amount>0);
 
-  // Cars have child rows in car_contributions. Do NOT delete stale cars
-  // before their child contribution rows are removed (FK constraint).
-  // First upsert cars so new contribution rows can reference them, then
-  // reconcile contributions, and only after that remove stale cars.
-  const cloudSyncCarsAndContrib = async()=>{
-    if(!onlineMode) return;
-    const cleanCars=cleanRowsFor('cars',cars);
-    const cleanContrib=cleanRowsFor('car_contributions',contrib);
-    if(cleanCars.length){
-      const {error:e}=await sb.from('cars').upsert(cleanCars,{onConflict:'id'});
-      if(e) throw e;
-    }
-    // Remove contribution rows for deleted cars / removed partner shares.
-    const {data:existingContrib,error:ec}=await sb.from('car_contributions').select('id');
-    if(ec) throw ec;
-    const keepContrib=new Set(cleanContrib.map(r=>String(r.id)));
-    for(const r of (existingContrib||[])){
-      if(!keepContrib.has(String(r.id))){
-        const {error:e}=await sb.from('car_contributions').delete().eq('id',r.id);
-        if(e) throw e;
+  // Critical ledgers use delta-only sync. A stale device may have old local
+  // car/finance data after opening the app or editing an unrelated customer.
+  // In that case, do NOT replace the current cloud ledger with the stale copy.
+  const syncCriticalDelta = async(table, localRows, snapshotRows)=>{
+    if(!onlineMode || !sb) return;
+    const cleanLocal=cleanRowsFor(table,localRows);
+    const baseline=cleanRowsFor(table,snapshotRows||[]);
+    const keyOf=r=>String(r?.id??'');
+    const normalize=v=>JSON.stringify(v||{});
+    const baseMap=new Map(baseline.map(r=>[keyOf(r),r]));
+    const localMap=new Map(cleanLocal.map(r=>[keyOf(r),r]));
+    const {data:remoteRows,error:re}=await sb.from(table).select('*');
+    if(re) throw re;
+    const remoteMap=new Map((remoteRows||[]).map(r=>[keyOf(r),r]));
+    const changed=[];
+    for(const [id,row] of localMap){
+      const base=baseMap.get(id);
+      if(!base || normalize(row)!==normalize(base)){
+        const remote=remoteMap.get(id);
+        // If both devices changed the same row since the last cloud snapshot,
+        // prefer the newer cloud state rather than letting stale local data win.
+        if(base && remote && normalize(remote)!==normalize(base) && normalize(remote)!==normalize(row)) continue;
+        changed.push(row);
       }
     }
-    if(cleanContrib.length){
-      const {error:e}=await sb.from('car_contributions').upsert(cleanContrib,{onConflict:'id'});
+    if(changed.length){
+      const {error:e}=await sb.from(table).upsert(changed,{onConflict:'id'});
       if(e) throw e;
     }
-    // Now it is safe to delete cars that no longer exist locally.
-    const {data:existingCars,error:eq}=await sb.from('cars').select('id');
-    if(eq) throw eq;
-    const keepCars=new Set(cleanCars.map(r=>String(r.id)));
-    for(const r of (existingCars||[])){
-      if(!keepCars.has(String(r.id))){
-        const {error:e}=await sb.from('cars').delete().eq('id',r.id);
-        if(e) throw e;
-      }
-    }
+    // Deliberately no automatic deletes for critical ledgers. A missing row
+    // on one device is not enough evidence that it was intentionally deleted.
   };
 
+  const snapshot=window.__cloudSnapshot||{};
   await Promise.all([
-    cloudSyncCarsAndContrib(),
-    cloudReplace('partners',partners),
-    cloudReplace('cash_transactions',cash),
+    syncCriticalDelta('cars',cars,snapshot.cars),
+    syncCriticalDelta('car_contributions',contrib,snapshot.contrib),
+    syncCriticalDelta('partners',partners,snapshot.partners),
+    syncCriticalDelta('cash_transactions',cash,snapshot.cash),
     syncPendingRequestsToCloud(),
     cloudReplace('employees',employees),
     cloudReplace('employee_transactions',employeeTx),
-    cloudReplace('partner_transactions',partnerTx),
+    syncCriticalDelta('partner_transactions',partnerTx,snapshot.partner_transactions),
     cloudReplace('customers',customers),
     cloudReplace('refunds',A('مبالغ تسترد').map((r,i)=>({id:Number(r.id)||i+1,item:r['البند']||r['اسم البند']||null,amount:Number(r['المبلغ'])||0,category:r['الفئة']||r['التصنيف']||null,recovery_method:r['طريقة الاسترداد']||null,recovered:Number(r['تم استرداده'])||0,remaining:Number(r['المتبقي'])||Math.max(0,(Number(r['المبلغ'])||0)-(Number(r['تم استرداده'])||0)),notes:r['ملاحظات']||null})))
   ]);
 
+  // Refresh the baseline after a successful critical sync so subsequent
+  // unrelated edits cannot replay an old state.
+  window.__cloudSnapshot={
+    ...(window.__cloudSnapshot||{}),
+    cars, partners, contrib, cash, partner_transactions: A('حركة الشركاء')
+  };
   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ أونلاين';
 }
 </script>
@@ -693,7 +696,7 @@ function printCurrentReport(){
   if(detail){ clone.innerHTML=detail.innerHTML; }
   const selected=document.getElementById('partnerDetailSelect');
   const reportTitle=selected ? ('كشف شريك تفصيلي - '+(selected.options[selected.selectedIndex]?.text||'')) : (showroomPage&&!showroomPage.classList.contains('hidden')?'تقرير المعرض':(report.dataset.reportTitle||'تقرير TN Auto'));
-  const ps=tnPrintLoad(); const logoTop=ps.showLogo==='yes'?'<img src="LOGO_DATA" alt="TN AUTO">':''; const logoFoot=ps.showLogo==='yes'?'<img src="LOGO_DATA" alt="TN AUTO">':''; const dateLine=ps.showDate==='yes'?`<div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('en-GB')}</div>`:''; const footer=''; const html=`<div class="report-print-sheet" style="font-size:${esc(ps.fontSize)}px">
+  const ps=tnPrintLoad(); const logoTop=ps.showLogo==='yes'?'<img src="LOGO_DATA" alt="TN AUTO">':''; const logoFoot=ps.showLogo==='yes'?'<img src="LOGO_DATA" alt="TN AUTO">':''; const dateLine=ps.showDate==='yes'?`<div class="date">تاريخ الطباعة: ${new Date().toLocaleDateString('en-GB')}</div>`:''; const footer=ps.showFooter==='yes'?`<div class="report-print-footer">${logoFoot}<div class="company">${esc(ps.company)}</div></div>`:''; const html=`<div class="report-print-sheet" style="font-size:${esc(ps.fontSize)}px">
     <div class="report-print-header">${logoTop}<div class="company">${esc(ps.company)}</div><div class="title">${esc(reportTitle)}</div>${dateLine}</div>
     <div class="report-print-body">${clone.innerHTML}</div>${footer}
   </div>`;
@@ -713,7 +716,7 @@ function printCurrentReport(){
     window.scrollTo(0,0);
   };
   window.addEventListener('afterprint',cleanup);
-  window.print();
+  setTimeout(()=>window.print(),120);
 }
 function renderReport(type){
   const out=document.getElementById('reportOutput'); if(!out)return;
@@ -898,7 +901,7 @@ function completeReservedSale(carId){
   const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c||sold(c))return alert('العربية غير متاحة للبيع.');
   const m=salesMeta(c); saleModal(carId,m.agreed||m.expected||0);
 }
-function renderAll(){renderDash();renderSalesPage();renderCustomersPage();renderCars();renderRequests();renderPartners();renderActiveContribTable();table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();if(typeof renderShowroomDashboard==='function')renderShowroomDashboard();renderEmployees();const __fin=financialCashBalances();cashCurrent.textContent=money(__fin.book);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
+function renderAll(){renderDash();renderSalesPage();renderCustomersPage();renderCars();renderRequests();renderPartners();renderActiveContribTable();table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();renderShowroomDashboard();if(typeof renderShowroomDashboard==='function')renderShowroomDashboard();renderEmployees();const __fin=financialCashBalances();cashCurrent.textContent=money(__fin.book);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
 const fields={
 car:[['العربية','text'],['الموديل','number'],['السنة','number'],['اللون','text'],['العداد','number'],['المرور','text'],['الرخصة','text'],['سعر الشراء','number'],['عمولة الشراء','number'],['دفع من الخزنة؟','select','نعم|لا'],['مصدر العربية / المورد','text'],['رقم المورد','text'],['اسم العميل المشتري','text'],['رقم تليفون العميل','text'],['حالة البيع','select','لم تُسجل بيانات البيع بعد|تم الحجز|مباعة'],['سعر البيع','number'],['عمولة البيع','number'],['صافي الربح الحقيقي','number'],['ثلث المعرض','number'],['ثلثان للشركاء','number'],['ملاحظات','textarea']],
 request:[['التاريخ','date'],['اسم العميل','text'],['رقم التليفون','text'],['السيارة المطلوبة','text'],['الموديل','number'],['الميزانية','number'],['كاش/تقسيط','select','كاش|تقسيط'],['المقدم','number'],['اللون','text'],['الحالة','select','جديد|تم التواصل|بانتظار عربية|تم توفير عربية|تم البيع|مغلق'],['مسؤول الطلب','text'],['ملاحظات','textarea']],
@@ -1408,6 +1411,15 @@ function showroomProfitTotals(){
   },0);
   const total=earned+deposited+employeeNet;
   return {earned,deposited,withdrawn,employeeNet,total,remaining:total-withdrawn};
+}
+function renderShowroomDashboard(){
+  const t=showroomProfitTotals();
+  const card=document.getElementById('showroomBalanceCard');
+  const breakdown=document.getElementById('showroomBreakdown');
+  const mini=document.getElementById('showroomMiniReport');
+  if(card) card.innerHTML=`رصيد المعرض: <b>${money(t.remaining)} ج.م</b>`;
+  if(breakdown) breakdown.innerHTML=`ربح المعرض من العربيات: <b>${money(t.earned)} ج.م</b> — إيداعات كاش: <b>${money(t.deposited)} ج.م</b> — تأثير الموظفين: <b>${money(t.employeeNet)} ج.م</b> — المسحوب: <b>${money(t.withdrawn)} ج.م</b>`;
+  if(mini) mini.innerHTML=`<div class="note">إجمالي الأرباح: <b>${money(t.earned)} ج.م</b></div><div class="note">الإيداعات: <b>${money(t.deposited)} ج.م</b></div><div class="note">المسحوبات: <b>${money(t.withdrawn)} ج.م</b></div><div class="note">الرصيد الحالي: <b>${money(t.remaining)} ج.م</b></div>`;
 }
 function renderShowroomReport(){
   const out=document.getElementById('showroomReportOutput'); if(!out)return;
