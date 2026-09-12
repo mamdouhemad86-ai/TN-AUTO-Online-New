@@ -952,6 +952,11 @@ async function saveModal(){
  const purchase=Number(obj['سعر الشراء'])||0,total=pcs.reduce((a,x)=>a+x.amount,0);
  if(pcs.length && Math.abs(total-purchase)>0.01){alert('إجمالي مساهمات الشركاء لازم يساوي سعر الشراء.\nسعر الشراء: '+money(purchase)+'\nالمساهمات: '+money(total));return;}
  obj['مساهمات الشركاء']=pcs.map(x=>x.name+': '+x.amount).join(' | ');
+ // التمويل يُفهم تلقائياً من المساهمات: بدون مساهمات = تمويل معرض 100%.
+ const __purchaseFunding = {purchase:purchase,partnerFunded:total,showroomFunded:Math.max(0,purchase-total),type:total<=0?'showroom':Math.abs(total-purchase)<=0.01?'partners':'mixed'};
+ obj.__TN_FUNDING_TYPE=__purchaseFunding.type;
+ obj.__TN_PARTNER_FUNDED=__purchaseFunding.partnerFunded;
+ obj.__TN_SHOWROOM_FUNDED=__purchaseFunding.showroomFunded;
  const oldVehicle=A('العربيات')[ctx.index];
  const vi={color:obj['اللون']||'',mileage:Number(obj['العداد'])||0,traffic:obj['المرور']||'',license:obj['الرخصة']||''};
  if(oldVehicle&&String(oldVehicle['ملاحظات']||'').includes('__TN_')){ /* preserve other internal sales markers while replacing vehicle info */ }
@@ -1208,6 +1213,14 @@ async function del(s,i){
   save();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحذف وتحديث الحسابات';
 }
 function getCarPartnerShares(car){const out=[];String(car?.['مساهمات الشركاء']||'').split('|').map(x=>x.trim()).filter(Boolean).forEach(part=>{const m=part.match(/^(.+?):\s*([\d.,]+)/);if(!m)return;const name=m[1].trim(),amount=Number(m[2].replace(/,/g,''))||0;if(amount>0)out.push({name,amount});});return out;}
+function getCarFunding(car){
+  const purchase=Math.max(0,roundWhole(car?.['سعر الشراء']));
+  const shares=getCarPartnerShares(car);
+  const partnerFunded=Math.min(purchase,Math.max(0,roundWhole(shares.reduce((s,x)=>s+x.amount,0))));
+  const showroomFunded=Math.max(0,purchase-partnerFunded);
+  const type=partnerFunded<=0 ? 'showroom' : showroomFunded<=0 ? 'partners' : 'mixed';
+  return {purchase,partnerFunded,showroomFunded,type,fullyShowroomFunded:type==='showroom'};
+}
 function roundWhole(n){return Math.round(Number(n)||0);}
 function distributePartnerAmounts(changedEl){
   const rows=[...document.querySelectorAll('.partner-profit-amount')];
@@ -1217,7 +1230,9 @@ function distributePartnerAmounts(changedEl){
   const c=A('العربيات')[Number(sc?.value)],sell=Number(sp?.value)||0,com=Number(scom?.value)||0;
   const profit=sell-(Number(c?.['سعر الشراء'])||0)-(Number(c?.['عمولة الشراء'])||0)-com;
   const total=Math.max(0,roundWhole(profit));
-  let showroom=Math.min(total,Math.max(0,roundWhole(showroomActualProfit?.value)));
+  const funding=getCarFunding(c);
+  let showroom=funding.fullyShowroomFunded ? total : Math.min(total,Math.max(0,roundWhole(showroomActualProfit?.value)));
+  if(funding.fullyShowroomFunded && showroomActualProfit)showroomActualProfit.value=String(showroom);
   const pool=Math.max(0,total-showroom);
   const manual=shares.filter(x=>x.manual);
   const flex=shares.filter(x=>!x.manual);
@@ -1262,7 +1277,22 @@ function renderPartnerProfitInputs(c,pool){
   amountEls.forEach(el=>el.addEventListener('input',()=>{el.dataset.manual='1';el.value=String(Math.max(0,roundWhole(el.value)));distributePartnerAmounts(el);}));
   distributePartnerAmounts();
 }
-function distributeSaleProfit(car,profit,showroom,amounts){const shares=getCarPartnerShares(car);if(!shares.length)throw new Error('لا توجد مساهمات شركاء مسجلة لهذه العربية.');const pool=Math.max(0,profit-showroom),total=shares.reduce((s,x)=>s+x.amount,0),vals=shares.map(x=>({name:x.name,amount:Math.max(0,Number(amounts?.[x.name])||0)}));if(Math.abs(vals.reduce((s,x)=>s+x.amount,0)-pool)>0.01)throw new Error('إجمالي أرباح الشركاء لا يساوي المبلغ المتاح للشركاء.');const tx=A('حركة الشركاء');for(let j=tx.length-1;j>=0;j--)if(Number(tx[j].car_id)===Number(car.id)&&String(tx[j]['نوع الحركة'])==='ربح')tx.splice(j,1);vals.forEach(v=>{if(v.amount>0)tx.push({'الشريك':v.name,'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'ربح','البيان':'ربح بيع '+cname(car),'المبلغ':v.amount,'ربح من العربيات':v.amount,'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':Number(car.id)});});const sh=A('ربح المعرض');for(let j=sh.length-1;j>=0;j--)if(Number(sh[j].car_id)===Number(car.id))sh.splice(j,1);sh.push({'العربية':cname(car),'التاريخ':new Date().toISOString().slice(0,10),'صافي الربح الحقيقي':profit,'ربح المعرض':showroom,'نسبة المعرض':profit>0?showroom/profit*100:0,'car_id':Number(car.id)});return {totalInvested:total};}
+function distributeSaleProfit(car,profit,showroom,amounts){
+  const shares=getCarPartnerShares(car);
+  const funding=getCarFunding(car);
+  // عربية ممولة بالكامل من المعرض: لا يوجد أي ربح للشركاء، وكل الربح للمعرض.
+  if(funding.fullyShowroomFunded){showroom=Math.max(0,roundWhole(profit));amounts={};}
+  const pool=Math.max(0,roundWhole(profit)-roundWhole(showroom));
+  const total=shares.reduce((s,x)=>s+x.amount,0);
+  const vals=shares.map(x=>({name:x.name,amount:Math.max(0,Number(amounts?.[x.name])||0)}));
+  if(!shares.length && pool>0)throw new Error('العربية ممولة بالكامل من المعرض، لذلك لا يوجد ربح موزع على الشركاء.');
+  if(Math.abs(vals.reduce((s,x)=>s+x.amount,0)-pool)>0.01)throw new Error('إجمالي أرباح الشركاء لا يساوي المبلغ المتاح للشركاء.');
+  const tx=A('حركة الشركاء');for(let j=tx.length-1;j>=0;j--)if(Number(tx[j].car_id)===Number(car.id)&&String(tx[j]['نوع الحركة'])==='ربح')tx.splice(j,1);
+  vals.forEach(v=>{if(v.amount>0)tx.push({'الشريك':v.name,'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'ربح','البيان':'ربح بيع '+cname(car),'المبلغ':v.amount,'ربح من العربيات':v.amount,'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':Number(car.id)});});
+  const sh=A('ربح المعرض');for(let j=sh.length-1;j>=0;j--)if(Number(sh[j].car_id)===Number(car.id))sh.splice(j,1);
+  sh.push({'العربية':cname(car),'التاريخ':new Date().toISOString().slice(0,10),'صافي الربح الحقيقي':profit,'ربح المعرض':showroom,'نسبة المعرض':profit>0?showroom/profit*100:0,'car_id':Number(car.id)});
+  return {totalInvested:total,funding};
+}
 function resetSaleDistribution(){
   if(typeof showroomActualProfit!=='undefined' && showroomActualProfit){showroomActualProfit.value='';delete showroomActualProfit.dataset.manual;}
   if(typeof partnersActualProfit!=='undefined' && partnersActualProfit){partnersActualProfit.value='';}
@@ -1283,12 +1313,14 @@ function updateSaleProfitPreview(){
   if(!c||!sell){if(saleProfitPreview)saleProfitPreview.innerHTML='أدخل سعر البيع لعرض صافي الربح والتوزيع.';return}
   const rawProfit=sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com;
   const p=roundWhole(rawProfit),total=Math.max(0,p);
+  const funding=getCarFunding(c);
   const hasShowroom=showroomActualProfit?.dataset.manual==='1'&&String(showroomActualProfit.value).trim()!=='';
-  let showroom=hasShowroom?Math.min(total,Math.max(0,roundWhole(showroomActualProfit.value))):Math.floor(total/3);
+  let showroom=funding.fullyShowroomFunded ? total : (hasShowroom?Math.min(total,Math.max(0,roundWhole(showroomActualProfit.value))):Math.floor(total/3));
   showroomActualProfit.value=String(showroom);
   const pool=Math.max(0,total-showroom);
   partnersActualProfit.value=String(pool);
-  saleProfitPreview.innerHTML=`صافي الربح: <b>${money(p)}</b> — المعرض: <b>${money(showroom)}</b> — الشركاء: <b>${money(pool)}</b> — كل التحكم بالمبالغ الصحيحة بدون كسور.`;
+  const fundingLabel=funding.fullyShowroomFunded?'تمويل المعرض 100%':funding.type==='mixed'?'تمويل مشترك':'تمويل الشركاء';
+  saleProfitPreview.innerHTML=`صافي الربح: <b>${money(p)}</b> — المعرض: <b>${money(showroom)}</b> — الشركاء: <b>${money(pool)}</b> — <span class="tag ok">${fundingLabel}</span> — كل التحكم بالمبالغ الصحيحة بدون كسور.`;
   renderPartnerProfitInputs(c,pool);
 }
 function saveSale(){
