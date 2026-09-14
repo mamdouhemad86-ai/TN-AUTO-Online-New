@@ -1169,6 +1169,23 @@ async function del(s,i){
     A('الموظفين').splice(i,1);
     try{const st=tnSecurityNormalize();st.employees=st.employees.filter(x=>String(x.employeeId)!==String(employeeId));tnSecuritySaveAndRender(st);}catch(e){console.warn('security cleanup',e);}
   }
+  if(s==='حركة الخزنة'&&row&&onlineMode&&sb){
+    const cashId=Number(row.id);
+    if(!Number.isFinite(cashId)){alert('لا يمكن حذف حركة الخزنة لأن رقمها غير موجود.');return;}
+    try{
+      const {error:e}=await sb.from('cash_transactions').delete().eq('id',cashId);
+      if(e) throw e;
+      A(s).splice(i,1);
+      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),cash:(window.__cloudSnapshot?.cash||[]).filter(x=>Number(x.id)!==cashId)};
+      save(false); renderAll();
+      if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حذف حركة الخزنة أونلاين';
+      alert('تم حذف حركة الخزنة من السحابة بنجاح.');
+    }catch(e){
+      console.error('delete cash transaction cloud error',e);
+      alert('لم يتم حذف حركة الخزنة أونلاين.\n\n'+(e.message||e));
+    }
+    return;
+  }
   if(s==='حركة الموظفين'&&row){ const name=String(row['الموظف']||''), amt=Number(row['المبلغ'])||0, date=String(row['التاريخ']||''), typeMap={'راتب':'راتب موظف','سلفة':'سلفة موظف','مكافأة':'مكافأة موظف','خصم':'خصم موظف'}; const cash=A('حركة الخزنة'); for(let j=cash.length-1;j>=0;j--){const x=cash[j]; if(String(x['العربية/البند']||'')===name && String(x['التاريخ']||'')===date && Number(x['المبلغ'])===amt && String(x['نوع الحركة']||'')===typeMap[row['نوع الحركة']]){cash.splice(j,1);break;}} }
   if(s==='طلبات العملاء'&&row){
     if(onlineMode){
