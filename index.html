@@ -976,7 +976,40 @@ async function saveModal(){
    let p=Number(obj['سعر البيع'])-Number(obj['سعر الشراء']||0)-Number(obj['عمولة الشراء']||0)-Number(obj['عمولة البيع']||0);
    obj['صافي الربح الحقيقي']=p;obj['ثلث المعرض']=p/3;obj['ثلثان للشركاء']=p*2/3;
  }
- if(ctx.type==='refund'){ const amount=Math.max(0,Number(obj['المبلغ'])||0), recovered=Math.max(0,Number(obj['تم استرداده'])||0); if(amount<=0){alert('مبلغ تسترد يجب أن يكون أكبر من صفر');return;} if(recovered>amount){alert('المبلغ المسترد لا يمكن أن يكون أكبر من أصل المبلغ');return;} obj['المبلغ']=amount; obj['تم استرداده']=recovered; obj['المتبقي']=amount-recovered; }
+ if(ctx.type==='refund'){
+   const amount=Math.max(0,Number(obj['المبلغ'])||0), recovered=Math.max(0,Number(obj['تم استرداده'])||0);
+   if(amount<=0){alert('مبلغ تسترد يجب أن يكون أكبر من صفر');return;}
+   if(recovered>amount){alert('المبلغ المسترد لا يمكن أن يكون أكبر من أصل المبلغ');return;}
+   obj['المبلغ']=amount; obj['تم استرداده']=recovered; obj['المتبقي']=amount-recovered;
+   // مبالغ تسترد: الحفظ أونلاين يكون مباشرًا قبل إغلاق النافذة، حتى لا تختفي
+   // التعديلات (خصوصًا تم استرداده) عند عمل Refresh قبل اكتمال المزامنة المؤجلة.
+   if(onlineMode && sb){
+     try{
+       const payload={item:String(obj['البند']||''),amount,recovery_method:obj['طريقة الاسترداد']||null,category:obj['الفئة']||obj['التصنيف']||null,recovered,remaining:amount-recovered,notes:obj['ملاحظات']||null};
+       let cloudRow,error;
+       if(isNew){
+         ({data:cloudRow,error}=await sb.from('refunds').insert(payload).select('*').single());
+       }else{
+         const refundId=Number(obj.id||a[ctx.index]?.id);
+         if(!Number.isFinite(refundId)) throw new Error('معرّف مبلغ الاسترداد غير صحيح');
+         ({data:cloudRow,error}=await sb.from('refunds').update(payload).eq('id',refundId).select('*').single());
+       }
+       if(error) throw error;
+       if(!cloudRow) throw new Error('قاعدة البيانات لم تُرجع مبلغ الاسترداد بعد الحفظ.');
+       const savedObj={...obj,id:Number(cloudRow.id), 'البند':cloudRow.item||'', 'المبلغ':Number(cloudRow.amount)||0, 'الفئة':cloudRow.category||'', 'طريقة الاسترداد':cloudRow.recovery_method||'', 'تم استرداده':Number(cloudRow.recovered)||0, 'المتبقي':Number(cloudRow.remaining)||Math.max(0,(Number(cloudRow.amount)||0)-(Number(cloudRow.recovered)||0)), 'ملاحظات':cloudRow.notes||''};
+       if(isNew) a.push(savedObj); else a[ctx.index]=savedObj;
+       window.__cloudSnapshot={...(window.__cloudSnapshot||{}),refunds:[...(window.__cloudSnapshot?.refunds||[]).filter(x=>Number(x.id)!==Number(savedObj.id)),{id:Number(savedObj.id),item:savedObj['البند'],amount:Number(savedObj['المبلغ'])||0,category:savedObj['الفئة']||null,recovery_method:savedObj['طريقة الاسترداد']||null,recovered:Number(savedObj['تم استرداده'])||0,remaining:Number(savedObj['المتبقي'])||0,notes:savedObj['ملاحظات']||null}]};
+       save(false); closeModal(); renderAll();
+       if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ مبلغ الاسترداد أونلاين ✓';
+       return;
+     }catch(e){
+       console.error('Refund cloud save error',e);
+       if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ مبلغ الاسترداد أونلاين';
+       alert('لم يتم حفظ مبلغ الاسترداد أونلاين، لذلك لم نغلق النافذة ولم نعتبر العملية ناجحة.\n\n'+(e.message||e));
+       return;
+     }
+   }
+ }
  if(ctx.type==='partner'){
    const capital=Number(obj['إجمالي المبلغ المسجل'])||0, invested=Number(obj['الموزع على العربيات'])||0;
    if(capital<0 || invested<0 || invested>capital){alert('بيانات الشريك غير صحيحة: رأس المال والموزع يجب أن يكونا موجبين، والموزع لا يتجاوز رأس المال.');return;}
@@ -1214,6 +1247,23 @@ async function del(s,i){
     return;
   }
   if(s==='حركة الموظفين'&&row){ const name=String(row['الموظف']||''), amt=Number(row['المبلغ'])||0, date=String(row['التاريخ']||''), typeMap={'راتب':'راتب موظف','سلفة':'سلفة موظف','مكافأة':'مكافأة موظف','خصم':'خصم موظف'}; const cash=A('حركة الخزنة'); for(let j=cash.length-1;j>=0;j--){const x=cash[j]; if(String(x['العربية/البند']||'')===name && String(x['التاريخ']||'')===date && Number(x['المبلغ'])===amt && String(x['نوع الحركة']||'')===typeMap[row['نوع الحركة']]){cash.splice(j,1);break;}} }
+  if(s==='مبالغ تسترد'&&row && onlineMode && sb){
+    const refundId=Number(row.id);
+    if(!Number.isFinite(refundId)){alert('لا يمكن حذف مبلغ الاسترداد لأن رقمه غير موجود.');return;}
+    try{
+      const {error:e}=await sb.from('refunds').delete().eq('id',refundId);
+      if(e) throw e;
+      A(s).splice(i,1);
+      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),refunds:(window.__cloudSnapshot?.refunds||[]).filter(x=>Number(x.id)!==refundId)};
+      save(false); renderAll();
+      if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حذف مبلغ الاسترداد أونلاين';
+      alert('تم حذف مبلغ الاسترداد من السحابة بنجاح.');
+    }catch(e){
+      console.error('delete refund cloud error',e);
+      alert('لم يتم حذف مبلغ الاسترداد أونلاين.\n\n'+(e.message||e));
+    }
+    return;
+  }
   if(s==='طلبات العملاء'&&row){
     if(onlineMode){
       const requestId=Number(row.id);
@@ -1732,23 +1782,27 @@ function saveShowroomWithdraw(){
   alert('تم تسجيل سحب ربح المعرض وتحديث الخزنة.');
 }
 function showroomExpenseModal(){
+  const box=document.getElementById('showroomExpenseBox'), dateEl=document.getElementById('sed'), amountEl=document.getElementById('sea'), typeEl=document.getElementById('set'), noteEl=document.getElementById('sen'), infoEl=document.getElementById('showroomExpenseInfo');
+  if(!box||!dateEl||!amountEl||!typeEl||!noteEl||!infoEl)return alert('تعذر فتح نافذة مصاريف المعرض. أعد تحميل الصفحة.');
   const t=showroomProfitTotals();
-  sed.value=new Date().toISOString().slice(0,10); sea.value=''; set.value='مصاريف المعرض'; sen.value='';
-  showroomExpenseInfo.innerHTML=`الرصيد الحالي للمعرض: <b>${money(t.remaining)}</b> ج.م — المصروف سيُسجل كخروج من الخزنة ويخصم من رصيد المعرض.`;
-  showroomExpenseBox.classList.remove('hidden');
+  dateEl.value=new Date().toISOString().slice(0,10); amountEl.value=''; typeEl.value='مصاريف المعرض'; noteEl.value='';
+  infoEl.innerHTML=`الرصيد الحالي للمعرض: <b>${money(t.remaining)}</b> ج.م — المصروف سيُسجل كخروج من الخزنة ويخصم من رصيد المعرض.`;
+  box.classList.remove('hidden');
 }
-function closeShowroomExpense(){showroomExpenseBox.classList.add('hidden')}
+function closeShowroomExpense(){const box=document.getElementById('showroomExpenseBox');if(box)box.classList.add('hidden')}
 function saveShowroomExpense(){
-  const amt=roundWhole(sea.value);
+  const amountEl=document.getElementById('sea'),dateEl=document.getElementById('sed'),typeEl=document.getElementById('set'),noteEl=document.getElementById('sen');
+  if(!amountEl||!dateEl||!typeEl||!noteEl)return alert('تعذر حفظ مصروف المعرض. أعد تحميل الصفحة.');
+  const amt=roundWhole(amountEl.value);
   if(amt<=0)return alert('اكتب مبلغ مصروف صحيح بالجنيه.');
   const t=showroomProfitTotals();
   if(amt>t.remaining)return alert(`مبلغ المصروف أكبر من رصيد المعرض المتاح. المتاح: ${money(t.remaining)} ج.م`);
-  const date=sed.value||new Date().toISOString().slice(0,10);
-  const desc=String(sen.value||set.value||'مصاريف المعرض').trim();
+  const date=dateEl.value||new Date().toISOString().slice(0,10);
+  const desc=String(noteEl.value||typeEl.value||'مصاريف المعرض').trim();
   const cash=A('حركة الخزنة'),bal=cashBalance();
-  cash.push({'id':nextLocalId('حركة الخزنة'),'التاريخ':date,'نوع الحركة':'مصاريف المعرض','العربية/البند':String(set.value||'مصاريف المعرض'),'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':bal-amt,'ملاحظات':'[SHOWROOM-EXPENSE] '+desc});
+  cash.push({'id':nextLocalId('حركة الخزنة'),'التاريخ':date,'نوع الحركة':'مصاريف المعرض','العربية/البند':String(typeEl.value||'مصاريف المعرض'),'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':bal-amt,'ملاحظات':'[SHOWROOM-EXPENSE] '+desc});
   save(); closeShowroomExpense(); renderAll(); renderShowroomWithdrawSummary();
-  if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل مصروف المعرض';
+  if(typeof sysStatus!='undefined')sysStatus.textContent='تم تسجيل مصروف المعرض';
   alert('تم تسجيل مصروف المعرض وتحديث الخزنة ورصيد المعرض.');
 }
 function cashModal(){cd.value=new Date().toISOString().slice(0,10);ct.value='';ci.value='';ca.value='';cin.value=0;cout.value=0;cn.value='';cashBox.classList.remove('hidden')}
