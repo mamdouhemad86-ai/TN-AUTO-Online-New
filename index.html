@@ -60,29 +60,12 @@ async function cloudSelect(table){
   if(error) throw error;
   return data||[];
 }
-async function cloudReplace(table, rows){
-  if(!onlineMode)return;
-  const clean=cleanRowsFor(table,rows||[]);
-  // Fast sync: one bulk upsert + at most one bulk delete.
-  if(clean.length){
-    const {error:e}=await sb.from(table).upsert(clean,{onConflict:'id'});
-    if(e) throw e;
-    const ids=clean.map(r=>Number(r.id)).filter(Number.isFinite);
-    if(ids.length){
-      const {error:d}=await sb.from(table).delete().not('id','in',`(${ids.join(',')})`);
-      if(d) throw d;
-    }
-  }else{
-    const {error:d}=await sb.from(table).delete().neq('id',0);
-    if(d) throw d;
-  }
-}
 
 function applyCloudSnapshot(s){
   if(!s) return;
   const hasCloud = Object.values(s).some(v=>Array.isArray(v)&&v.length);
   if(!hasCloud) return false;
-  if(Array.isArray(s.cars)) S['العربيات']=s.cars.map(r=>({id:r.id,'العربية':r.name||'', 'الموديل':r.model||'', 'السنة':r.year||'', 'سعر الشراء':Number(r.purchase_price)||0, 'عمولة الشراء':Number(r.purchase_commission)||0, 'سعر البيع':r.sale_price==null?'':Number(r.sale_price), 'عمولة البيع':Number(r.sale_commission)||0, 'حالة البيع':r.status==='sold'?'مباع':'متاح', 'المورد':r.supplier||'', 'هاتف المورد':r.supplier_phone||'', 'اسم المشتري':r.customer_name||'', 'هاتف المشتري':r.customer_phone||'', 'ملاحظات':r.notes||'', 'تاريخ الشراء':r.purchased_at||'', 'تاريخ البيع':r.sold_at||''}));
+  if(Array.isArray(s.cars)) S['العربيات']=s.cars.map(r=>({id:r.id,'العربية':r.name||'', 'الموديل':r.model||'', 'السنة':r.year||'', 'سعر الشراء':Number(r.purchase_price)||0, 'عمولة الشراء':Number(r.purchase_commission)||0, 'سعر البيع':r.sale_price==null?'':Number(r.sale_price), 'عمولة البيع':Number(r.sale_commission)||0, 'حالة البيع':r.status==='sold'?'مباع':(String(r.notes||'').includes('__TN_RETURNED=1')?'مرتجعة':'متاح'), 'المورد':r.supplier||'', 'هاتف المورد':r.supplier_phone||'', 'اسم المشتري':r.customer_name||'', 'هاتف المشتري':r.customer_phone||'', 'ملاحظات':r.notes||'', 'تاريخ الشراء':r.purchased_at||'', 'تاريخ البيع':r.sold_at||''}));
   if(Array.isArray(s.partners)) S['الشركاء']=s.partners.map(r=>({id:r.id,'الشريك':r.name||'', 'إجمالي المبلغ المسجل':Number(r.capital)||0, 'رأس المال الأساسي':Number(r.base_capital)||Number(r.capital)||0}));
   if(Array.isArray(s.contrib)) {
     S['مساهمات العربيات']=s.contrib.map(r=>({id:r.id,'car_id':r.car_id,'الشريك':r.partner_name||'', 'المبلغ':Number(r.amount)||0,'partner_id':r.partner_id||null}));
@@ -203,19 +186,9 @@ async function syncLocalToCloud(){
   if(!onlineMode)return;
   if(typeof sysStatus!=='undefined')sysStatus.textContent='جاري الحفظ أونلاين...';
 
-  // Prevent a stale device from deleting employees created on another device.
-  if(sb && !__employeeCloudWriteBusy){
-    try{
-      const {data:cloudEmployees,error:empErr}=await sb.from('employees').select('*').order('id',{ascending:true});
-      if(!empErr && Array.isArray(cloudEmployees)){
-        const local=A('الموظفين');
-        const cloudRows=cloudEmployees.map(e=>({id:e.id,'الموظف':e.name||'','الوظيفة':e.job_title||'','رقم الهاتف':e.phone||'','الراتب الشهري':Number(e.monthly_salary)||0,'تاريخ التعيين':e.hire_date||'','الحالة':e.status==='inactive'?'غير نشط':'نشط','ملاحظات':e.notes||''}));
-        const cloudIds=new Set(cloudRows.map(x=>String(x.id)));
-        const localOnly=local.filter(x=>x?.id!=null && !cloudIds.has(String(x.id)));
-        S['الموظفين']=cloudRows.concat(localOnly);
-      }
-    }catch(e){ console.warn('Employee cloud pre-sync read failed:',e); }
-  }
+  // IMPORTANT: never overwrite local employee edits with a cloud read here.
+  // Delta sync below already has a baseline/conflict check; replacing local rows
+  // before that check could silently discard an edit made on this device.
 
   // The existing UI uses Arabic sheet-shaped objects, so only map the
   // core tables here; the remaining UI stays local until its DB mapping
@@ -261,7 +234,7 @@ async function syncLocalToCloud(){
     transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10)
   }));
   const partnerMap=new Map(partners.map(p=>[p.name,p.id]));
-  const partnerTx=A('حركة الشركاء').map((r,i)=>({id:Number(r.id)||i+1,partner_id:partnerMap.get(String(r['الشريك']))||null,type:({'ربح':'profit','إضافة':'deposit','سحب':'withdrawal'})[r['نوع الحركة']]||'other',amount:Number(r['المبلغ'])||0,car_id:Number(r['car_id'])||null,description:r['البيان']||null,transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10)})).filter(x=>x.partner_id&&x.amount>0);
+  const partnerTx=A('حركة الشركاء').map((r,i)=>({id:Number(r.id)||i+1,partner_id:partnerMap.get(String(r['الشريك']))||null,type:({'ربح':'profit','إضافة':'deposit','سحب':'withdrawal'})[r['نوع الحركة']]||'other',amount:Number(r['المبلغ'])||0,car_id:Number(r['car_id'])||null,description:r['البيان']||null,transaction_date:r['التاريخ']||new Date().toISOString().slice(0,10)})).filter(x=>x.partner_id&&Number(x.amount)!==0);
   const customers=A('العملاء').map((r,i)=>tnCustomerCloudRow(r,i));
   const employees=A('الموظفين').map((r,i)=>({id:Number(r.id)||i+1,name:String(r['الموظف']||''),job_title:r['الوظيفة']||null,phone:r['رقم الهاتف']||null,monthly_salary:Number(r['الراتب الشهري'])||0,hire_date:r['تاريخ التعيين']||null,status:r['الحالة']==='غير نشط'?'inactive':'active',notes:r['ملاحظات']||null}));
   const employeeMap=new Map(employees.map(e=>[e.name,e.id]));
@@ -296,8 +269,20 @@ async function syncLocalToCloud(){
       const {error:e}=await sb.from(table).upsert(changed,{onConflict:'id'});
       if(e) throw e;
     }
-    // Deliberately no automatic deletes for critical ledgers. A missing row
-    // on one device is not enough evidence that it was intentionally deleted.
+    // Delete only rows that existed in this device's last cloud snapshot and
+    // were intentionally removed locally. If the remote row changed since that
+    // snapshot, keep the remote version rather than allowing a stale device to delete it.
+    const deleted=[];
+    for(const [id,base] of baseMap){
+      if(!localMap.has(id)){
+        const remote=remoteMap.get(id);
+        if(remote && normalize(remote)===normalize(base)) deleted.push(id);
+      }
+    }
+    if(deleted.length){
+      const {error:d}=await sb.from(table).delete().in('id',deleted);
+      if(d) throw d;
+    }
   };
 
   const snapshot=window.__cloudSnapshot||{};
@@ -307,18 +292,22 @@ async function syncLocalToCloud(){
     syncCriticalDelta('partners',partners,snapshot.partners),
     syncCriticalDelta('cash_transactions',cash,snapshot.cash),
     syncPendingRequestsToCloud(),
-    cloudReplace('employees',employees),
-    cloudReplace('employee_transactions',employeeTx),
+    syncCriticalDelta('employees',employees,snapshot.employees),
+    syncCriticalDelta('employee_transactions',employeeTx,snapshot.employee_transactions),
     syncCriticalDelta('partner_transactions',partnerTx,snapshot.partner_transactions),
-    cloudReplace('customers',customers),
-    cloudReplace('refunds',A('مبالغ تسترد').map((r,i)=>({id:Number(r.id)||i+1,item:r['البند']||r['اسم البند']||null,amount:Number(r['المبلغ'])||0,category:r['الفئة']||r['التصنيف']||null,recovery_method:r['طريقة الاسترداد']||null,recovered:Number(r['تم استرداده'])||0,remaining:Number(r['المتبقي'])||Math.max(0,(Number(r['المبلغ'])||0)-(Number(r['تم استرداده'])||0)),notes:r['ملاحظات']||null})))
+    syncCriticalDelta('customers',customers,snapshot.customers),
+    syncCriticalDelta('refunds',A('مبالغ تسترد').map((r,i)=>({id:Number(r.id)||i+1,item:r['البند']||r['اسم البند']||null,amount:Number(r['المبلغ'])||0,category:r['الفئة']||r['التصنيف']||null,recovery_method:r['طريقة الاسترداد']||null,recovered:Number(r['تم استرداده'])||0,remaining:Number(r['المتبقي'])||Math.max(0,(Number(r['المبلغ'])||0)-(Number(r['تم استرداده'])||0)),notes:r['ملاحظات']||null})),snapshot.refunds)
   ]);
 
   // Refresh the baseline after a successful critical sync so subsequent
   // unrelated edits cannot replay an old state.
+  const employeesDb=employees;
   window.__cloudSnapshot={
     ...(window.__cloudSnapshot||{}),
-    cars, partners, contrib, cash, partner_transactions: A('حركة الشركاء')
+    cars, partners, contrib, cash,
+    employees: employeesDb, employee_transactions: employeeTx,
+    customers, refunds: A('مبالغ تسترد').map((r,i)=>({id:Number(r.id)||i+1,item:r['البند']||r['اسم البند']||null,amount:Number(r['المبلغ'])||0,category:r['الفئة']||r['التصنيف']||null,recovery_method:r['طريقة الاسترداد']||null,recovered:Number(r['تم استرداده'])||0,remaining:Number(r['المتبقي'])||Math.max(0,(Number(r['المبلغ'])||0)-(Number(r['تم استرداده'])||0)),notes:r['ملاحظات']||null})),
+    partner_transactions: partnerTx
   };
   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ أونلاين';
 }
@@ -884,7 +873,7 @@ function saveSalesAgreement(carId){
   const m=salesMeta(c); m.agreed=Math.max(0,agreed); setSalesMeta(c,m); save(); renderSalesPage();
   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتفق عليه';
 }
-async function tnUpsertCustomerFromReservation(name,phone){if(!name)return;let c=A('العملاء').find(x=>String(x['رقم الهاتف']||'').replace(/\D/g,'')===String(phone||'').replace(/\D/g,''))||A('العملاء').find(x=>normText(x['العميل'])===normText(name));if(!c){c={id:A('العملاء').reduce((m,x)=>Math.max(m,Number(x.id)||0),0)+1,'العميل':name,'رقم الهاتف':phone,'واتساب':phone,'تاريخ الميلاد':'','العنوان':'','الوظيفة':'','التصنيف':'عادي','ملاحظات':'',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};A('العملاء').push(c)}else{c['العميل']=name;c['رقم الهاتف']=phone;c['واتساب']=c['واتساب']||phone;c.updated_at=new Date().toISOString()}save(false);if(onlineMode)try{await upsertTable('customers',[tnCustomerCloudRow(c,0)])}catch(e){console.warn(e)}}
+async function tnUpsertCustomerFromReservation(name,phone){if(!name)return;let c=A('العملاء').find(x=>String(x['رقم الهاتف']||'').replace(/\D/g,'')===String(phone||'').replace(/\D/g,''))||A('العملاء').find(x=>normText(x['العميل'])===normText(name));if(!c){c={id:Date.now(),'العميل':name,'رقم الهاتف':phone,'واتساب':phone,'تاريخ الميلاد':'','العنوان':'','الوظيفة':'','التصنيف':'عادي','ملاحظات':'',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};A('العملاء').push(c)}else{c['العميل']=name;c['رقم الهاتف']=phone;c['واتساب']=c['واتساب']||phone;c.updated_at=new Date().toISOString()}save(false);if(onlineMode)try{await upsertTable('customers',[tnCustomerCloudRow(c,0)])}catch(e){console.warn(e)}}
 function toggleSalesReservation(carId,flag){
   if(!tnHas('edit'))return alert('ليس لديك صلاحية تعديل حالة الحجز.');
   const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
@@ -1342,10 +1331,13 @@ function distributeSaleProfit(car,profit,showroom,amounts){
   const vals=shares.map(x=>({name:x.name,amount:Math.max(0,Number(amounts?.[x.name])||0)}));
   if(!shares.length && pool>0)throw new Error('العربية ممولة بالكامل من المعرض، لذلك لا يوجد ربح موزع على الشركاء.');
   if(Math.abs(vals.reduce((s,x)=>s+x.amount,0)-pool)>0.01)throw new Error('إجمالي أرباح الشركاء لا يساوي المبلغ المتاح للشركاء.');
-  const tx=A('حركة الشركاء');for(let j=tx.length-1;j>=0;j--)if(Number(tx[j].car_id)===Number(car.id)&&String(tx[j]['نوع الحركة'])==='ربح')tx.splice(j,1);
-  vals.forEach(v=>{if(v.amount>0)tx.push({'الشريك':v.name,'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'ربح','البيان':'ربح بيع '+cname(car),'المبلغ':v.amount,'ربح من العربيات':v.amount,'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':Number(car.id)});});
-  const sh=A('ربح المعرض');for(let j=sh.length-1;j>=0;j--)if(Number(sh[j].car_id)===Number(car.id))sh.splice(j,1);
-  sh.push({'العربية':cname(car),'التاريخ':new Date().toISOString().slice(0,10),'صافي الربح الحقيقي':profit,'ربح المعرض':showroom,'نسبة المعرض':profit>0?showroom/profit*100:0,'car_id':Number(car.id)});
+  const saleToken=((String(car['ملاحظات']||'').match(/__TN_SALE_ID=([^\n]+)/)||[])[1]||('LEGACY-'+car.id));
+  // Keep every sale as immutable history. A returned/re-sold car may have
+  // several legitimate profit events, so never delete old sale rows by car_id.
+  const tx=A('حركة الشركاء');
+  vals.forEach(v=>{if(v.amount>0)tx.push({'الشريك':v.name,'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'ربح','البيان':'[SALE-ID:'+saleToken+'] ربح بيع '+cname(car),'المبلغ':v.amount,'ربح من العربيات':v.amount,'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':Number(car.id)});});
+  const sh=A('ربح المعرض');
+  sh.push({'العربية':cname(car),'التاريخ':new Date().toISOString().slice(0,10),'صافي الربح الحقيقي':profit,'ربح المعرض':showroom,'نسبة المعرض':profit>0?showroom/profit*100:0,'car_id':Number(car.id),'ملاحظات':'[SALE-ID:'+saleToken+'] ربح المعرض من البيع'});
   return {totalInvested:total,funding};
 }
 function resetSaleDistribution(){
@@ -1378,7 +1370,7 @@ function updateSaleProfitPreview(){
   saleProfitPreview.innerHTML=`صافي الربح: <b>${money(p)}</b> — المعرض: <b>${money(showroom)}</b> — الشركاء: <b>${money(pool)}</b> — <span class="tag ok">${fundingLabel}</span> — كل التحكم بالمبالغ الصحيحة بدون كسور.`;
   renderPartnerProfitInputs(c,pool);
 }
-function saveSale(){
+async function saveSale(){
   let i=Number(sc.value),c=A('العربيات')[i],sell=roundWhole(sp.value),com=roundWhole(scom.value);
   if(!c||!sell)return alert('اختار عربية واكتب سعر بيع صحيح');
   let p=roundWhole(sell-(Number(c['سعر الشراء'])||0)-(Number(c['عمولة الشراء'])||0)-com);
@@ -1390,40 +1382,92 @@ function saveSale(){
   let sum=0;
   inputs.forEach(e=>{const v=Math.max(0,roundWhole(e.value));e.value=String(v);amounts[e.dataset.partner]=v;sum+=v;});
   if(inputs.length&&sum!==pool)return alert(`إجمالي أرباح الشركاء يجب أن يساوي ${money(pool)} ج.م بالضبط. الحالي ${money(sum)} ج.م`);
+  const saleToken='SALE-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+  const saleDate=new Date().toISOString().slice(0,10);
+  const userNotes=String(snotes.value||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(SALE_ID|RETURNED|EXPECTED_SALE|AGREED_SALE|RESERVED|CUSTOMER|CUSTOMER_PHONE)=/.test(x));
+  const finalNotes=[...userNotes,'__TN_SALE_ID='+saleToken].join('\n');
+
+  // Online: sale is one atomic Supabase transaction. No local financial rows are
+  // created until the RPC succeeds, preventing partial sale/profit/cash states.
+  if(onlineMode && sb){
+    if(window.__saleBusy)return alert('جاري تسجيل عملية بيع، انتظر لحظات.');
+    window.__saleBusy=true;
+    try{
+      const shares=getCarPartnerShares(c), partnerByName=new Map(A('الشركاء').map(x=>[String(x['الشريك']),x])), byName=new Map(shares.map(x=>[String(x.name),{...x,partner_id:Number(partnerByName.get(String(x.name))?.id||0)}]));
+      const partnerProfits=Object.entries(amounts).filter(([,amt])=>Number(amt)>0).map(([name,amt])=>({partner_id:Number(byName.get(String(name))?.partner_id||0),amount:Number(amt)}));
+      if(partnerProfits.some(x=>!x.partner_id))throw new Error('تعذر تحديد شريك من توزيع الربح');
+      const {data,error}=await sb.rpc('record_car_sale_atomic',{
+        p_car_id:Number(c.id),p_sale_price:sell,p_sale_commission:com,p_showroom_profit:showroom,
+        p_partner_profits:partnerProfits,p_customer_name:document.getElementById('sb').value,p_customer_phone:document.getElementById('sphone').value,
+        p_sale_date:saleDate,p_notes:finalNotes,p_sale_token:saleToken
+      });
+      if(error)throw error;
+      if(!data||Number(data.car_id)!==Number(c.id)||String(data.sale_token)!==saleToken)throw new Error('لم يتم تأكيد عملية البيع الذرية على السحابة');
+      c['حالة البيع']='مباعة'; c['سعر البيع']=sell; c['عمولة البيع']=com; c['اسم المشتري']=document.getElementById('sb').value; c['هاتف المشتري']=document.getElementById('sphone').value;
+      c['تاريخ البيع']=saleDate; c['صافي الربح الحقيقي']=p; c['نسبة المعرض']=p>0?showroom/p*100:0; c['نسبة الشركاء']=p>0?pool/p*100:0; c['مبلغ المعرض']=showroom; c['مبلغ الشركاء']=pool; c['ملاحظات']=finalNotes;
+      const __sm=salesMeta(c); __sm.reserved=false; __sm.agreed=0; __sm.expected=__sm.expected||0; setSalesMeta(c,__sm);
+      const tx=A('حركة الشركاء'), ids=Array.isArray(data.partner_transaction_ids)?data.partner_transaction_ids.map(Number):[];
+      let idPos=0;
+      Object.entries(amounts).forEach(([name,amt])=>{if(Number(amt)>0){const pid=Number(byName.get(String(name))?.partner_id||0);tx.push({'id':ids[idPos++]||nextLocalId('حركة الشركاء'),'الشريك':name,'التاريخ':saleDate,'نوع الحركة':'ربح','البيان':'[SALE-ID:'+saleToken+'] ربح بيع '+cname(c),'المبلغ':Number(amt),'ربح من العربيات':Number(amt),'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':Number(c.id),'partner_id':pid});}});
+      const cash=A('حركة الخزنة');
+      cash.push({'id':Number(data.cash_in_id),'التاريخ':saleDate,'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':0,'الرصيد':cashBalance()+sell,'ملاحظات':'[AUTO-SALE] [SALE-ID:'+saleToken+'] إيداع قيمة البيع','car_id':Number(c.id)});
+      if(com>0)cash.push({'id':Number(data.cash_out_id),'التاريخ':saleDate,'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':com,'داخل':0,'خارج':com,'الرصيد':cashBalance()-com,'ملاحظات':'[AUTO-SALE] [SALE-ID:'+saleToken+'] خصم عمولة البيع','car_id':Number(c.id)});
+      const sh=A('ربح المعرض'); sh.push({'العربية':cname(c),'التاريخ':saleDate,'صافي الربح الحقيقي':p,'ربح المعرض':showroom,'نسبة المعرض':p>0?showroom/p*100:0,'car_id':Number(c.id),'ملاحظات':'[SALE-ID:'+saleToken+'] ربح المعرض من البيع'});
+      window.__cloudSnapshot=window.__cloudSnapshot||{};
+      window.__cloudSnapshot.cars=(window.__cloudSnapshot.cars||[]).map(r=>Number(r.id)===Number(c.id)?{...r,status:'sold',sale_price:sell,sale_commission:com,customer_name:document.getElementById('sb').value,customer_phone:document.getElementById('sphone').value,sold_at:saleDate,notes:finalNotes}:r);
+      window.__cloudSnapshot.cash=[...(window.__cloudSnapshot.cash||[]),{id:Number(data.cash_in_id),type:'income',amount:sell,description:'[AUTO-SALE] [SALE-ID:'+saleToken+'] إيداع قيمة البيع',car_id:Number(c.id),partner_id:null,transaction_date:saleDate}];
+      if(com>0)window.__cloudSnapshot.cash.push({id:Number(data.cash_out_id),type:'expense',amount:com,description:'[AUTO-SALE] [SALE-ID:'+saleToken+'] خصم عمولة البيع',car_id:Number(c.id),partner_id:null,transaction_date:saleDate});
+      window.__cloudSnapshot.partner_transactions=[...(window.__cloudSnapshot.partner_transactions||[]),...Object.entries(amounts).filter(([,amt])=>Number(amt)>0).map(([name,amt],k)=>({id:ids[k],partner_id:Number(byName.get(String(name))?.partner_id||0),type:'profit',amount:Number(amt),car_id:Number(c.id),description:'[SALE-ID:'+saleToken+'] ربح بيع '+cname(c),transaction_date:saleDate}))];
+      localStorage.setItem(KEY,JSON.stringify(S));
+      closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع أونلاين كعملية ذرية';alert('تم تسجيل البيع بالكامل: العربية + الأرباح + الخزنة في عملية واحدة.');
+    }catch(e){console.error('Atomic sale failed:',e);if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ البيع';alert('لم يتم تسجيل البيع أونلاين، ولم يتم تغيير العربية أو الأرباح أو الخزنة.\n\n'+(e.message||e));}
+    finally{window.__saleBusy=false;}
+    return;
+  }
+
+  c['ملاحظات']=finalNotes;
   try{distributeSaleProfit(c,p,showroom,amounts)}catch(e){return alert(e.message||e)}
-  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=new Date().toISOString().slice(0,10);c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;c['ملاحظات']=snotes.value; const __sm=salesMeta(c); __sm.reserved=false; __sm.agreed=0; __sm.expected=__sm.expected||0; setSalesMeta(c,__sm); c['ملاحظات']=String(snotes.value||'').split('\n').filter(Boolean).filter(x=>!/^__TN_(EXPECTED_SALE|AGREED_SALE|RESERVED|CUSTOMER|CUSTOMER_PHONE)=/.test(x)).join('\n');
-  const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] إيداع قيمة البيع وخصم عمولة البيع تلقائياً','car_id':Number(c.id)});
+  c['حالة البيع']='مباعة';c['سعر البيع']=sell;c['عمولة البيع']=com;c['اسم المشتري']=sb.value;c['هاتف المشتري']=sphone.value;c['تاريخ البيع']=saleDate;c['صافي الربح الحقيقي']=p;c['نسبة المعرض']=p>0?showroom/p*100:0;c['نسبة الشركاء']=p>0?pool/p*100:0;c['مبلغ المعرض']=showroom;c['مبلغ الشركاء']=pool;
+  const __sm=salesMeta(c); __sm.reserved=false; __sm.agreed=0; __sm.expected=__sm.expected||0; setSalesMeta(c,__sm); c['ملاحظات']=finalNotes;
+  const cash=A('حركة الخزنة'),oldBal=cashBalance();cash.push({'التاريخ':saleDate,'نوع الحركة':'بيع عربية','العربية/البند':c['العربية'],'المبلغ':sell,'داخل':sell,'خارج':com,'الرصيد':oldBal+sell-com,'ملاحظات':'[AUTO-SALE] [SALE-ID:'+saleToken+'] إيداع قيمة البيع وخصم عمولة البيع تلقائياً','car_id':Number(c.id)});
   save();closeSale();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل البيع';alert('تم تسجيل البيع وتحديث المخزون والربح والخزنة');
 }
-function returnSale(index){
+async function returnSale(index){
   const cars=A('العربيات'), c=cars[Number(index)];
   if(!c||!sold(c)||!Number(c['سعر البيع'])) return alert('العربية دي مش مسجلة كمباعة.');
-  const originalName=c['العربية']||'', originalSale=roundWhole(c['سعر البيع']), originalCom=roundWhole(c['عمولة البيع']);
-  const profit=roundWhole(c['صافي الربح الحقيقي']);
+  const originalName=c['العربية']||'';
   if(!confirm(`تأكيد إرجاع بيع العربية: ${originalName}؟\nسيتم عكس البيع والخزنة وأرباح الشركاء وربح المعرض، وإرجاع العربية للمخزون.`)) return;
   const date=new Date().toISOString().slice(0,10), carId=Number(c.id)||null;
-  // Reverse the partner profit entries for this exact car.
-  const mv=A('حركة الشركاء');
-  const saleMoves=mv.filter(x=>String(x['نوع الحركة'])==='ربح' && (Number(x.car_id)===carId || String(x['البيان']||'')===('ربح بيع '+originalName)) && !String(x['البيان']||'').includes('[SALE-REVERSAL]'));
-  saleMoves.forEach(x=>mv.push({'الشريك':x['الشريك'],'التاريخ':date,'نوع الحركة':'ربح','البيان':'[SALE-REVERSAL] عكس ربح بيع '+originalName,'المبلغ':-Math.abs(roundWhole(x['المبلغ']||x['ربح من العربيات'])),'ربح من العربيات':-Math.abs(roundWhole(x['ربح من العربيات']||x['المبلغ'])),'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':carId}));
-  // Reverse showroom profit without deleting its history.
-  const sh=A('ربح المعرض');
-  const shRows=sh.filter(x=>Number(x.car_id)===carId && !String(x['ملاحظات']||'').includes('[SALE-REVERSAL]'));
-  shRows.forEach(x=>sh.push({'العربية':originalName,'التاريخ':date,'صافي الربح الحقيقي':-Math.abs(roundWhole(x['صافي الربح الحقيقي']||profit)),'ربح المعرض':-Math.abs(roundWhole(x['ربح المعرض'])),'نسبة المعرض':0,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] عكس ربح المعرض'}));
-  // Reverse the original sale cash movement, preserving the ledger history.
-  const cash=A('حركة الخزنة');
-  const saleCash=cash.find(x=>(Number(x.car_id)===carId || String(x['العربية/البند']||'')===originalName) && String(x['ملاحظات']||'').includes('[AUTO-SALE]') && !String(x['ملاحظات']||'').includes('[SALE-REVERSAL]'));
-  const saleIn=saleCash?roundWhole(saleCash['داخل']||saleCash['المبلغ']):originalSale;
-  const saleOut=saleCash?roundWhole(saleCash['خارج']):originalCom;
-  const bal=cashBalance();
-  cash.push({'id':nextLocalId('حركة الخزنة'),'التاريخ':date,'نوع الحركة':'إرجاع بيع عربية','العربية/البند':originalName,'المبلغ':saleIn,'داخل':saleOut,'خارج':saleIn,'الرصيد':bal+saleOut-saleIn,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] عكس عملية بيع العربية بالكامل'});
-  // Keep a trace of the returned sale while making the car available again.
-  c['حالة البيع']='مرتجعة'; c['تاريخ إرجاع البيع']=date; c['سبب إرجاع البيع']='إرجاع عملية البيع';
-  c['سعر البيع الأصلي']=originalSale; c['عمولة البيع الأصلية']=originalCom; c['ربح البيع الأصلي']=profit;
-  c['سعر البيع']=''; c['عمولة البيع']=0; c['اسم المشتري']=''; c['هاتف المشتري']=''; c['تاريخ البيع']=''; c['صافي الربح الحقيقي']=''; c['نسبة المعرض']=''; c['نسبة الشركاء']=''; c['مبلغ المعرض']=''; c['مبلغ الشركاء']='';
-  save();renderAll();renderCars();
-  if(typeof sysStatus!=='undefined')sysStatus.textContent='تم إرجاع البيع وعكس آثاره';
-  alert('تم إرجاع البيع بنجاح. العربية رجعت للمخزون وتم عكس حركة الخزنة وأرباح الشركاء وربح المعرض.');
+  const saleToken=(String(c['ملاحظات']||'').match(/__TN_SALE_ID=([^\n]+)/)||[])[1]||'';
+  if(onlineMode && sb){
+    if(window.__returnBusy)return alert('جاري تنفيذ إرجاع، انتظر لحظات.');
+    window.__returnBusy=true;
+    try{
+      const {data,error}=await sb.rpc('return_car_sale_atomic',{p_car_id:carId,p_return_date:date});
+      if(error)throw error;
+      if(!data||Number(data.car_id)!==carId||String(data.sale_token)!==saleToken)throw new Error('لم يتم تأكيد الإرجاع الذري على السحابة');
+      const profit=roundWhole(c['صافي الربح الحقيقي']);
+      const mv=A('حركة الشركاء');
+      const reversalRows=Array.isArray(data.partner_reversal_ids)?data.partner_reversal_ids:[];
+      const originalMoves=mv.filter(x=>String(x['نوع الحركة'])==='ربح'&&Number(x.car_id)===carId&&String(x['البيان']||'').includes('[SALE-ID:'+saleToken+']')&&!String(x['البيان']||'').includes('[SALE-REVERSAL]'));
+      originalMoves.forEach((x,k)=>{const rr=reversalRows[k];mv.push({'id':Number(rr?.id)||nextLocalId('حركة الشركاء'),'الشريك':x['الشريك'],'التاريخ':date,'نوع الحركة':'ربح','البيان':'[SALE-REVERSAL] [SALE-ID:'+saleToken+'] عكس ربح بيع '+originalName,'المبلغ':-Math.abs(roundWhole(x['المبلغ']||x['ربح من العربيات'])),'ربح من العربيات':-Math.abs(roundWhole(x['ربح من العربيات']||x['المبلغ'])),'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':carId,'partner_id':Number(rr?.partner_id)||x.partner_id||null});});
+      window.__cloudSnapshot.partner_transactions=[...(window.__cloudSnapshot.partner_transactions||[]),...reversalRows.map(r=>({id:Number(r.id),partner_id:Number(r.partner_id),type:'profit',amount:Number(r.amount),car_id:carId,description:'[SALE-REVERSAL] [SALE-ID:'+saleToken+'] عكس ربح بيع '+originalName,transaction_date:date}))];
+      const cash=A('حركة الخزنة');
+      const saleIn=roundWhole(data.sale_price), saleCom=roundWhole(data.sale_commission);
+      cash.push({'id':Number(data.cash_reversal_sale_id),'التاريخ':date,'نوع الحركة':'إرجاع بيع عربية','العربية/البند':originalName,'المبلغ':saleIn,'داخل':0,'خارج':saleIn,'الرصيد':cashBalance()-saleIn,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] [SALE-ID:'+saleToken+'] عكس قيمة البيع'});
+      if(saleCom>0)cash.push({'id':Number(data.cash_reversal_commission_id),'التاريخ':date,'نوع الحركة':'إرجاع بيع عربية','العربية/البند':originalName,'المبلغ':saleCom,'داخل':saleCom,'خارج':0,'الرصيد':cashBalance()+saleCom,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] [SALE-ID:'+saleToken+'] عكس عمولة البيع'});
+      window.__cloudSnapshot.cash=[...(window.__cloudSnapshot.cash||[]),{id:Number(data.cash_reversal_sale_id),type:'expense',amount:saleIn,description:'[SALE-REVERSAL] [SALE-ID:'+saleToken+'] عكس قيمة البيع',car_id:carId,partner_id:null,transaction_date:date}]; if(saleCom>0)window.__cloudSnapshot.cash.push({id:Number(data.cash_reversal_commission_id),type:'income',amount:saleCom,description:'[SALE-REVERSAL] [SALE-ID:'+saleToken+'] عكس عمولة البيع',car_id:carId,partner_id:null,transaction_date:date});
+      const oldNotes=String(c['ملاحظات']||''); c['حالة البيع']='مرتجعة';c['تاريخ إرجاع البيع']=date;c['ملاحظات']=oldNotes.split('\n').filter(Boolean).filter(x=>!/^__TN_RETURNED=1$/.test(x)).concat('__TN_RETURNED=1').join('\n');c['سبب إرجاع البيع']='إرجاع عملية البيع';c['سعر البيع الأصلي']=saleIn;c['عمولة البيع الأصلية']=saleCom;c['ربح البيع الأصلي']=profit;c['سعر البيع']='';c['عمولة البيع']=0;c['اسم المشتري']='';c['هاتف المشتري']='';c['تاريخ البيع']='';c['صافي الربح الحقيقي']='';c['نسبة المعرض']='';c['نسبة الشركاء']='';c['مبلغ المعرض']='';c['مبلغ الشركاء']='';
+      window.__cloudSnapshot=window.__cloudSnapshot||{}; window.__cloudSnapshot.cars=(window.__cloudSnapshot.cars||[]).map(r=>Number(r.id)===carId?{...r,status:'available',sale_price:null,sale_commission:0,sold_at:null,customer_name:null,customer_phone:null,notes:c['ملاحظات']}:r);
+      localStorage.setItem(KEY,JSON.stringify(S));renderAll();renderCars();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم إرجاع البيع أونلاين كعملية ذرية';alert('تم إرجاع البيع بالكامل وعكس آثاره في عملية واحدة.');
+    }catch(e){console.error('Atomic return failed:',e);if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل الإرجاع';alert('لم يتم الإرجاع أونلاين، ولم يتم تغيير العربية أو الأرباح أو الخزنة.\n\n'+(e.message||e));}
+    finally{window.__returnBusy=false;}
+    return;
+  }
+  const originalSale=roundWhole(c['سعر البيع']),originalCom=roundWhole(c['عمولة البيع']),profit=roundWhole(c['صافي الربح الحقيقي']);
+  const mv=A('حركة الشركاء');const saleMoves=mv.filter(x=>String(x['نوع الحركة'])==='ربح'&&(saleToken?String(x['البيان']||'').includes('[SALE-ID:'+saleToken+']'):(Number(x.car_id)===carId||String(x['البيان']||'')===('ربح بيع '+originalName)))&&!String(x['البيان']||'').includes('[SALE-REVERSAL]'));saleMoves.forEach(x=>mv.push({'الشريك':x['الشريك'],'التاريخ':date,'نوع الحركة':'ربح','البيان':'[SALE-REVERSAL] '+(saleToken?'[SALE-ID:'+saleToken+'] ':'')+'عكس ربح بيع '+originalName,'المبلغ':-Math.abs(roundWhole(x['المبلغ']||x['ربح من العربيات'])),'ربح من العربيات':-Math.abs(roundWhole(x['ربح من العربيات']||x['المبلغ'])),'الإضافة الكلية':0,'السحب الكلي':0,'الرصيد':0,'car_id':carId}));
+  const sh=A('ربح المعرض');const shRows=sh.filter(x=>Number(x.car_id)===carId&&!String(x['ملاحظات']||'').includes('[SALE-REVERSAL]')&&(saleToken?String(x['ملاحظات']||'').includes('[SALE-ID:'+saleToken+']'):true));shRows.forEach(x=>sh.push({'العربية':originalName,'التاريخ':date,'صافي الربح الحقيقي':-Math.abs(roundWhole(x['صافي الربح الحقيقي']||profit)),'ربح المعرض':-Math.abs(roundWhole(x['ربح المعرض'])),'نسبة المعرض':0,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] '+(saleToken?'[SALE-ID:'+saleToken+'] ':'')+'عكس ربح المعرض'}));
+  const cash=A('حركة الخزنة');const saleCash=cash.find(x=>(Number(x.car_id)===carId||String(x['العربية/البند']||'')===originalName)&&String(x['ملاحظات']||'').includes('[AUTO-SALE]')&&(!saleToken||String(x['ملاحظات']||'').includes('[SALE-ID:'+saleToken+']'))&&!String(x['ملاحظات']||'').includes('[SALE-REVERSAL]'));const saleIn=saleCash?roundWhole(saleCash['داخل']||saleCash['المبلغ']):originalSale;const saleOut=saleCash?roundWhole(saleCash['خارج']):originalCom;const bal=cashBalance();cash.push({'id':nextLocalId('حركة الخزنة'),'التاريخ':date,'نوع الحركة':'إرجاع بيع عربية','العربية/البند':originalName,'المبلغ':saleIn,'داخل':saleOut,'خارج':saleIn,'الرصيد':bal+saleOut-saleIn,'car_id':carId,'ملاحظات':'[SALE-REVERSAL] '+(saleToken?'[SALE-ID:'+saleToken+'] ':'')+'عكس عملية بيع العربية بالكامل'});c['حالة البيع']='مرتجعة';c['تاريخ إرجاع البيع']=date;c['ملاحظات']=String(c['ملاحظات']||'').split('\n').filter(Boolean).filter(x=>!/^__TN_RETURNED=1$/.test(x)).concat('__TN_RETURNED=1').join('\n');c['سبب إرجاع البيع']='إرجاع عملية البيع';c['سعر البيع الأصلي']=originalSale;c['عمولة البيع الأصلية']=originalCom;c['ربح البيع الأصلي']=profit;c['سعر البيع']='';c['عمولة البيع']=0;c['اسم المشتري']='';c['هاتف المشتري']='';c['تاريخ البيع']='';c['صافي الربح الحقيقي']='';c['نسبة المعرض']='';c['نسبة الشركاء']='';c['مبلغ المعرض']='';c['مبلغ الشركاء']='';save();renderAll();renderCars();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم إرجاع البيع وعكس آثاره';alert('تم إرجاع البيع بنجاح. العربية رجعت للمخزون وتم عكس حركة الخزنة وأرباح الشركاء وربح المعرض.');
 }
 function additionalDepositModal(){
   const partners=A('الشركاء');
@@ -1556,10 +1600,13 @@ function showroomProfitTotals(){
     const purchaseCom=roundWhole(c['عمولة الشراء']);
     const saleCom=roundWhole(c['عمولة البيع']);
     const totalProfit=Math.max(0,roundWhole(sale-purchase-purchaseCom-saleCom));
+    const saleToken=(String(c['ملاحظات']||'').match(/__TN_SALE_ID=([^\n]+)/)||[])[1]||'';
     const partnerProfit=partnerMoves.reduce((ps,x)=>{
       if(String(x['نوع الحركة'])!=='ربح') return ps;
       if(Number(x.car_id)!==Number(c.id)) return ps;
-      return ps+Math.max(0,roundWhole(x['المبلغ']||x['ربح من العربيات']));
+      const desc=String(x['البيان']||'');
+      if(saleToken && !desc.includes('[SALE-ID:'+saleToken+']')) return ps;
+      return ps+roundWhole(x['المبلغ']||x['ربح من العربيات']);
     },0);
     return s+Math.max(0,totalProfit-partnerProfit);
   },0);
@@ -1599,7 +1646,8 @@ function renderShowroomReport(){
     const purchaseCom=roundWhole(c['عمولة الشراء']);
     const saleCom=roundWhole(c['عمولة البيع']);
     const realProfit=roundWhole(c['صافي الربح الحقيقي']||sale-purchase-purchaseCom-saleCom);
-    const partnerProfit=A('حركة الشركاء').filter(x=>String(x['نوع الحركة'])==='ربح'&&Number(x.car_id)===Number(c.id)).reduce((n,x)=>n+Math.max(0,roundWhole(x['المبلغ']||x['ربح من العربيات'])),0);
+    const saleToken=(String(c['ملاحظات']||'').match(/__TN_SALE_ID=([^\n]+)/)||[])[1]||'';
+    const partnerProfit=A('حركة الشركاء').filter(x=>String(x['نوع الحركة'])==='ربح'&&Number(x.car_id)===Number(c.id)&&(!saleToken||String(x['البيان']||'').includes('[SALE-ID:'+saleToken+']'))).reduce((n,x)=>n+roundWhole(x['المبلغ']||x['ربح من العربيات']),0);
     const showroomProfit=Math.max(0,realProfit-partnerProfit);
     return {c,sale,purchase,purchaseCom,saleCom,realProfit,partnerProfit,showroomProfit};
   });
