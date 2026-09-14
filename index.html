@@ -524,7 +524,7 @@ function inventoryCashValue(){return A('العربيات').filter(x=>!sold(x)).r
 function manualCashNet(){
  const excludedTypes=new Set(['الرصيد الافتتاحي المعتمد من لوحة التحكم','إضافة شريك','إضافة رأس مال شريك','سحب شريك','بيع عربية','شراء عربية','إرجاع بيع عربية','سحب ربح المعرض','إيداع كاش من المعرض','مصاريف المعرض','راتب موظف','سلفة موظف','مكافأة موظف','خصم موظف','مصروف موظف']);
  const excludedMarkers=['[AUTO-PARTNER]','[AUTO-SALE]','[AUTO-PURCHASE]','[SALE-REVERSAL]','[SHOWROOM-PROFIT-WITHDRAWAL]','[SHOWROOM-CASH-DEPOSIT]','[SHOWROOM-EXPENSE]','[SHOWROOM-EMPLOYEE]'];
- return A('حركة الخزنة').reduce((s,x)=>{const type=String(x['نوع الحركة']||''),note=String(x['ملاحظات']||'');if(excludedTypes.has(type)||excludedMarkers.some(m=>note.includes(m)))return s;return s+(Number(x['داخل'])||0)-(Number(x['خارج'])||0);},0);
+ return A('حركة الخزنة').reduce((s,x)=>{const type=String(x['نوع الحركة']||''),note=String(x['ملاحظات']||'');const linkedPartner=Number(x['partner_id'])>0;/* Partner capital already feeds bookCashBalance; never count the linked cash row again. */if(linkedPartner||excludedTypes.has(type)||excludedMarkers.some(m=>note.includes(m)))return s;return s+(Number(x['داخل'])||0)-(Number(x['خارج'])||0);},0);
 }
 function showroomCashBalance(){return showroomProfitTotals().remaining}
 function bookCashBalance(){return partnerFundsBalance()-inventoryCashValue()+showroomCashBalance()+manualCashNet()}
