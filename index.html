@@ -1394,17 +1394,25 @@ async function saveAdditionalDeposit(){
   if(onlineMode && sb){
     try{
       const partnerId=Number(partner.id)||null;
-      const txId=nextLocalId('حركة الشركاء');
-      const cashId=nextLocalId('حركة الخزنة');
+      if(!partnerId) throw new Error('معرّف الشريك غير موجود');
+      // استخدم أرقامًا جديدة من السحابة نفسها لتجنب تصادم IDs مع حركات أُضيفت من جهاز آخر.
+      const [{data:ptRows,error:ptErr},{data:cashRows,error:cashErr}]=await Promise.all([
+        sb.from('partner_transactions').select('id').order('id',{ascending:false}).limit(1),
+        sb.from('cash_transactions').select('id').order('id',{ascending:false}).limit(1)
+      ]);
+      if(ptErr) throw ptErr; if(cashErr) throw cashErr;
+      const txId=(Number(ptRows?.[0]?.id)||0)+1;
+      const cashId=(Number(cashRows?.[0]?.id)||0)+1;
       const partnerRow={id:partnerId,name:String(partner['الشريك']||''),capital:Number(partner['إجمالي المبلغ المسجل'])||0,base_capital:Number(partner['رأس المال الأساسي'])||0};
       const txRow={id:txId,partner_id:partnerId,type:'deposit',amount:amt,car_id:null,description:wst.value||'إيداع إضافي لرأس المال',transaction_date:date};
       const cashRow={id:cashId,type:'income',amount:amt,description:'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),partner_id:partnerId,car_id:null,transaction_date:date};
-      const [pr,tx,cr]=await Promise.all([
-        sb.from('partners').upsert(partnerRow,{onConflict:'id'}),
-        sb.from('partner_transactions').upsert(txRow,{onConflict:'id'}),
-        sb.from('cash_transactions').upsert(cashRow,{onConflict:'id'})
-      ]);
-      if(pr.error)throw pr.error; if(tx.error)throw tx.error; if(cr.error)throw cr.error;
+      // احفظ الحساب الأساسي أولًا، ثم سجل الحركةين. أي فشل يُظهر السبب بدل نجاح كاذب.
+      const pr=await sb.from('partners').upsert(partnerRow,{onConflict:'id'});
+      if(pr.error)throw pr.error;
+      const tx=await sb.from('partner_transactions').upsert(txRow,{onConflict:'id'});
+      if(tx.error)throw tx.error;
+      const cr=await sb.from('cash_transactions').upsert(cashRow,{onConflict:'id'});
+      if(cr.error)throw cr.error;
       window.__cloudSnapshot={...(window.__cloudSnapshot||{}),partners:A('الشركاء').map((r,i)=>({id:Number(r.id)||i+1,name:String(r['الشريك']||''),capital:Number(r['إجمالي المبلغ المسجل'])||0,base_capital:Number(r['رأس المال الأساسي'])||Number(r['إجمالي المبلغ المسجل'])||0})),cash:A('حركة الخزنة').map((r,i)=>({id:Number(r.id)||i+1,type:(Number(r['داخل'])||0)>0?'income':'expense',amount:Math.abs((Number(r['داخل'])||0)-(Number(r['خارج'])||0)),description:r['ملاحظات']||r['العربية/البند']||null,partner_id:Number(r['partner_id'])||null,car_id:Number(r['car_id'])||null,transaction_date:r['التاريخ']||date})),partner_transactions:A('حركة الشركاء')};
       localStorage.setItem(KEY,JSON.stringify(S));
       closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل الإيداع أونلاين'; alert('تم تسجيل الإيداع وتحديث رصيد الشريك والخزنة أونلاين');
