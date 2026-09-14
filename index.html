@@ -1169,20 +1169,57 @@ async function del(s,i){
     A('الموظفين').splice(i,1);
     try{const st=tnSecurityNormalize();st.employees=st.employees.filter(x=>String(x.employeeId)!==String(employeeId));tnSecuritySaveAndRender(st);}catch(e){console.warn('security cleanup',e);}
   }
-  if(s==='حركة الخزنة'&&row&&onlineMode&&sb){
+  if(s==='حركة الخزنة'&&row){
     const cashId=Number(row.id);
     if(!Number.isFinite(cashId)){alert('لا يمكن حذف حركة الخزنة لأن رقمها غير موجود.');return;}
+    const isPartnerDeposit=String(row['ملاحظات']||'').includes('[AUTO-PARTNER]') && (Number(row['داخل'])||0)>0 && Number(row['partner_id']);
+    const partnerId=Number(row['partner_id'])||null;
+    const amt=Math.abs((Number(row['داخل'])||0)-(Number(row['خارج'])||0));
+    const date=String(row['التاريخ']||'');
+    const partner=A('الشركاء').find(p=>Number(p.id)===partnerId);
+    let partnerTx=null;
+    if(isPartnerDeposit && partnerId){
+      const candidates=A('حركة الشركاء').map((x,j)=>({x,j})).filter(({x})=>
+        String(x['نوع الحركة']||'')==='إضافة' &&
+        String(x['الشريك']||'')===String(partner?.['الشريك']||'') &&
+        Math.abs((Number(x['المبلغ'])||0)-amt)<0.0001 &&
+        String(x['التاريخ']||'')===date
+      );
+      partnerTx=candidates.length?candidates[candidates.length-1]:null;
+    }
     try{
-      const {error:e}=await sb.from('cash_transactions').delete().eq('id',cashId);
-      if(e) throw e;
+      if(onlineMode && sb){
+        const {error:e}=await sb.from('cash_transactions').delete().eq('id',cashId);
+        if(e) throw e;
+        if(partnerTx?.x?.id!=null){
+          const {error:pe}=await sb.from('partner_transactions').delete().eq('id',Number(partnerTx.x.id));
+          if(pe) throw pe;
+        }
+        if(isPartnerDeposit && partnerId && partner){
+          const newCapital=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-amt);
+          const newBase=Math.max(0,(Number(partner['رأس المال الأساسي'])||Number(partner['إجمالي المبلغ المسجل'])||0)-amt);
+          const {error:prErr}=await sb.from('partners').update({capital:newCapital,base_capital:newBase}).eq('id',partnerId);
+          if(prErr) throw prErr;
+          partner['إجمالي المبلغ المسجل']=newCapital;
+          partner['رأس المال الأساسي']=newBase;
+          partner['غير موزع']=Math.max(0,newCapital-(Number(partner['الموزع على العربيات'])||0));
+        }
+      }
       A(s).splice(i,1);
-      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),cash:(window.__cloudSnapshot?.cash||[]).filter(x=>Number(x.id)!==cashId)};
+      if(partnerTx){
+        A('حركة الشركاء').splice(partnerTx.j,1);
+      }
+      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),
+        cash:(window.__cloudSnapshot?.cash||[]).filter(x=>Number(x.id)!==cashId),
+        partner_transactions:(window.__cloudSnapshot?.partner_transactions||[]).filter(x=>Number(x.id)!==Number(partnerTx?.x?.id)),
+        partners:A('الشركاء').map((r,k)=>({id:Number(r.id)||k+1,name:String(r['الشريك']||''),capital:Number(r['إجمالي المبلغ المسجل'])||0,base_capital:Number(r['رأس المال الأساسي'])||Number(r['إجمالي المبلغ المسجل'])||0}))
+      };
       save(false); renderAll();
-      if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حذف حركة الخزنة أونلاين';
-      alert('تم حذف حركة الخزنة من السحابة بنجاح.');
+      if(typeof sysStatus!=='undefined')sysStatus.textContent=isPartnerDeposit?'تم حذف إيداع الشريك وتحديث الرصيد والخزنة أونلاين':'تم حذف حركة الخزنة أونلاين';
+      alert(isPartnerDeposit?'تم حذف إيداع الشريك بالكامل: الشريك والخزنة والتقرير.':'تم حذف حركة الخزنة من السحابة بنجاح.');
     }catch(e){
       console.error('delete cash transaction cloud error',e);
-      alert('لم يتم حذف حركة الخزنة أونلاين.\n\n'+(e.message||e));
+      alert('لم يتم حذف الحركة أونلاين.\n\n'+(e.message||e));
     }
     return;
   }
