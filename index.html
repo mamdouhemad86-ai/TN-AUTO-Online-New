@@ -63,8 +63,8 @@ async function cloudSelect(table){
 
 function applyCloudSnapshot(s){
   if(!s) return;
-  const hasCloud = Object.values(s).some(v=>Array.isArray(v)&&v.length);
-  if(!hasCloud) return false;
+  // A successful cloud snapshot may legitimately contain zero rows.
+  // In that case the cloud is still authoritative and local stale data must be cleared.
   if(Array.isArray(s.cars)) S['العربيات']=s.cars.map(r=>({id:r.id,'العربية':r.name||'', 'الموديل':r.model||'', 'السنة':r.year||'', 'سعر الشراء':Number(r.purchase_price)||0, 'عمولة الشراء':Number(r.purchase_commission)||0, 'سعر البيع':r.sale_price==null?'':Number(r.sale_price), 'عمولة البيع':Number(r.sale_commission)||0, 'حالة البيع':r.status==='sold'?'مباع':(String(r.notes||'').includes('__TN_RETURNED=1')?'مرتجعة':'متاح'), 'المورد':r.supplier||'', 'هاتف المورد':r.supplier_phone||'', 'اسم المشتري':r.customer_name||'', 'هاتف المشتري':r.customer_phone||'', 'ملاحظات':r.notes||'', 'تاريخ الشراء':r.purchased_at||'', 'تاريخ البيع':r.sold_at||''}));
   if(Array.isArray(s.partners)) S['الشركاء']=s.partners.map(r=>({id:r.id,'الشريك':r.name||'', 'إجمالي المبلغ المسجل':Number(r.capital)||0, 'رأس المال الأساسي':Number(r.base_capital)||Number(r.capital)||0}));
   if(Array.isArray(s.contrib)) {
@@ -1316,6 +1316,7 @@ function renderPartnerProfitInputs(c,pool){
     return `<div class="partner-profit-row" style="display:grid;grid-template-columns:1.4fr 1fr 1.2fr;gap:8px;align-items:center;margin:7px 0"><b>${esc(x.name)}</b><span>مساهمة: ${money(x.amount)}</span><label style="display:flex;gap:5px;align-items:center">ربح الشريك <input class="partner-profit-amount" data-partner="${esc(x.name)}" data-base-amount="${x.amount}" type="number" min="0" step="1" inputmode="numeric" value="${amount}"></label></div>`;
   }).join('')+`<div id="partnerDistributionNote" class="note" style="margin-top:8px">إجمالي أرباح الشركاء: ${money(wholePool)} — اكتب المبلغ الذي تريده لأي شريك، والباقي يتوزع تلقائيًا.</div>`;
   host.style.display='block';
+  host.dataset.carId=String(c?.id ?? '');
   const amountEls=[...rows.querySelectorAll('.partner-profit-amount')];
   amountEls.forEach(el=>el.dataset.manual='');
   amountEls.forEach(el=>el.addEventListener('input',()=>{el.dataset.manual='1';el.value=String(Math.max(0,roundWhole(el.value)));distributePartnerAmounts(el);}));
@@ -1341,6 +1342,8 @@ function distributeSaleProfit(car,profit,showroom,amounts){
   return {totalInvested:total,funding};
 }
 function resetSaleDistribution(){
+  const host=document.getElementById('partnerProfitInputs');
+  if(host)delete host.dataset.carId;
   if(typeof showroomActualProfit!=='undefined' && showroomActualProfit){showroomActualProfit.value='';delete showroomActualProfit.dataset.manual;}
   if(typeof partnersActualProfit!=='undefined' && partnersActualProfit){partnersActualProfit.value='';}
 }
@@ -1368,7 +1371,17 @@ function updateSaleProfitPreview(){
   partnersActualProfit.value=String(pool);
   const fundingLabel=funding.fullyShowroomFunded?'تمويل المعرض 100%':funding.type==='mixed'?'تمويل مشترك':'تمويل الشركاء';
   saleProfitPreview.innerHTML=`صافي الربح: <b>${money(p)}</b> — المعرض: <b>${money(showroom)}</b> — الشركاء: <b>${money(pool)}</b> — <span class="tag ok">${fundingLabel}</span> — كل التحكم بالمبالغ الصحيحة بدون كسور.`;
-  renderPartnerProfitInputs(c,pool);
+  const host=document.getElementById('partnerProfitInputs');
+  // Do not rebuild the partner inputs while the user is editing the showroom
+  // amount (or an existing partner amount). Rebuilding the DOM on every
+  // keystroke used to reset the manual flags and could make an amount like
+  // 25000 impossible to enter reliably. Re-render only when the selected car
+  // changes or the partner rows do not exist yet; otherwise recalculate the
+  // existing rows in place so manual amounts remain fixed.
+  const currentCarId=String(host?.dataset.carId ?? '');
+  const rowsExist=!!host?.querySelector('.partner-profit-amount');
+  if(currentCarId!==String(c.id) || !rowsExist) renderPartnerProfitInputs(c,pool);
+  else distributePartnerAmounts();
 }
 async function saveSale(){
   let i=Number(sc.value),c=A('العربيات')[i],sell=roundWhole(sp.value),com=roundWhole(scom.value);
@@ -1438,7 +1451,7 @@ async function returnSale(index){
   const originalName=c['العربية']||'';
   if(!confirm(`تأكيد إرجاع بيع العربية: ${originalName}؟\nسيتم عكس البيع والخزنة وأرباح الشركاء وربح المعرض، وإرجاع العربية للمخزون.`)) return;
   const date=new Date().toISOString().slice(0,10), carId=Number(c.id)||null;
-  const saleToken=(String(c['ملاحظات']||'').match(/__TN_SALE_ID=([^\n]+)/)||[])[1]||'';
+  const saleToken=((String(c['ملاحظات']||'').match(/(?:__TN_SALE_ID=|\[SALE-ID:)([^\]\n]+)/)||[])[1]||'');
   if(onlineMode && sb){
     if(window.__returnBusy)return alert('جاري تنفيذ إرجاع، انتظر لحظات.');
     window.__returnBusy=true;
@@ -1600,7 +1613,7 @@ function showroomProfitTotals(){
     const purchaseCom=roundWhole(c['عمولة الشراء']);
     const saleCom=roundWhole(c['عمولة البيع']);
     const totalProfit=Math.max(0,roundWhole(sale-purchase-purchaseCom-saleCom));
-    const saleToken=(String(c['ملاحظات']||'').match(/__TN_SALE_ID=([^\n]+)/)||[])[1]||'';
+    const saleToken=((String(c['ملاحظات']||'').match(/(?:__TN_SALE_ID=|\[SALE-ID:)([^\]\n]+)/)||[])[1]||'');
     const partnerProfit=partnerMoves.reduce((ps,x)=>{
       if(String(x['نوع الحركة'])!=='ربح') return ps;
       if(Number(x.car_id)!==Number(c.id)) return ps;
@@ -1624,8 +1637,13 @@ function showroomProfitTotals(){
     if(type==='خصم') return s+amt;
     return s;
   },0);
-  const total=earned+deposited+employeeNet;
-  return {earned,deposited,withdrawn,employeeNet,total,remaining:total-withdrawn};
+  const showroomExpenses=A('حركة الخزنة').reduce((s,x)=>{
+    const note=String(x['ملاحظات']||''), type=String(x['نوع الحركة']||'');
+    if(note.includes('[SHOWROOM-EXPENSE]') || type==='مصاريف المعرض') return s+Math.max(0,roundWhole(x['خارج']||x['المبلغ']));
+    return s;
+  },0);
+  const total=earned+deposited+employeeNet-showroomExpenses;
+  return {earned,deposited,withdrawn,employeeNet,showroomExpenses,total,remaining:total-withdrawn};
 }
 function renderShowroomDashboard(){
   const t=showroomProfitTotals();
@@ -1633,8 +1651,8 @@ function renderShowroomDashboard(){
   const breakdown=document.getElementById('showroomBreakdown');
   const mini=document.getElementById('showroomMiniReport');
   if(card) card.innerHTML=`رصيد المعرض: <b>${money(t.remaining)} ج.م</b>`;
-  if(breakdown) breakdown.innerHTML=`ربح المعرض من العربيات: <b>${money(t.earned)} ج.م</b> — إيداعات كاش: <b>${money(t.deposited)} ج.م</b> — تأثير الموظفين: <b>${money(t.employeeNet)} ج.م</b> — المسحوب: <b>${money(t.withdrawn)} ج.م</b>`;
-  if(mini) mini.innerHTML=`<div class="note">إجمالي الأرباح: <b>${money(t.earned)} ج.م</b></div><div class="note">الإيداعات: <b>${money(t.deposited)} ج.م</b></div><div class="note">المسحوبات: <b>${money(t.withdrawn)} ج.م</b></div><div class="note">الرصيد الحالي: <b>${money(t.remaining)} ج.م</b></div>`;
+  if(breakdown) breakdown.innerHTML=`ربح المعرض من العربيات: <b>${money(t.earned)} ج.م</b> — إيداعات كاش: <b>${money(t.deposited)} ج.م</b> — تأثير الموظفين: <b>${money(t.employeeNet)} ج.م</b> — مصاريف المعرض: <b>${money(t.showroomExpenses)} ج.م</b> — المسحوب: <b>${money(t.withdrawn)} ج.م</b>`;
+  if(mini) mini.innerHTML=`<div class="note">إجمالي الأرباح: <b>${money(t.earned)} ج.م</b></div><div class="note">الإيداعات: <b>${money(t.deposited)} ج.م</b></div><div class="note">مصاريف المعرض: <b>${money(t.showroomExpenses)} ج.م</b></div><div class="note">المسحوبات: <b>${money(t.withdrawn)} ج.م</b></div><div class="note">الرصيد الحالي: <b>${money(t.remaining)} ج.م</b></div>`;
 }
 function renderShowroomReport(){
   const out=document.getElementById('showroomReportOutput'); if(!out)return;
@@ -1646,7 +1664,7 @@ function renderShowroomReport(){
     const purchaseCom=roundWhole(c['عمولة الشراء']);
     const saleCom=roundWhole(c['عمولة البيع']);
     const realProfit=roundWhole(c['صافي الربح الحقيقي']||sale-purchase-purchaseCom-saleCom);
-    const saleToken=(String(c['ملاحظات']||'').match(/__TN_SALE_ID=([^\n]+)/)||[])[1]||'';
+    const saleToken=((String(c['ملاحظات']||'').match(/(?:__TN_SALE_ID=|\[SALE-ID:)([^\]\n]+)/)||[])[1]||'');
     const partnerProfit=A('حركة الشركاء').filter(x=>String(x['نوع الحركة'])==='ربح'&&Number(x.car_id)===Number(c.id)&&(!saleToken||String(x['البيان']||'').includes('[SALE-ID:'+saleToken+']'))).reduce((n,x)=>n+roundWhole(x['المبلغ']||x['ربح من العربيات']),0);
     const showroomProfit=Math.max(0,realProfit-partnerProfit);
     return {c,sale,purchase,purchaseCom,saleCom,realProfit,partnerProfit,showroomProfit};
@@ -1665,6 +1683,7 @@ function renderShowroomReport(){
       <div class="panel"><div class="label">ربح المعرض من العربيات المباعة</div><h2>${money(t.earned)} ج.م</h2></div>
       <div class="panel"><div class="label">إيداعات كاش من المعرض</div><h2>${money(t.deposited)} ج.م</h2></div>
       <div class="panel"><div class="label">تأثير حركات الموظفين</div><h2>${money(t.employeeNet)} ج.م</h2></div>
+      <div class="panel"><div class="label">مصاريف المعرض</div><h2>${money(t.showroomExpenses)} ج.م</h2></div>
       <div class="panel"><div class="label">المسحوب من رصيد المعرض</div><h2>${money(t.withdrawn)} ج.م</h2></div>
     </div>
     <div class="panel" style="margin-bottom:14px"><h3>ملخص رصيد المعرض</h3><div class="note">إجمالي رصيد المعرض: <b>${money(t.total)} ج.م</b> — المتبقي بعد السحب: <b>${money(t.remaining)} ج.م</b></div></div>
@@ -1712,6 +1731,26 @@ function saveShowroomWithdraw(){
   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل سحب ربح المعرض';
   alert('تم تسجيل سحب ربح المعرض وتحديث الخزنة.');
 }
+function showroomExpenseModal(){
+  const t=showroomProfitTotals();
+  sed.value=new Date().toISOString().slice(0,10); sea.value=''; set.value='مصاريف المعرض'; sen.value='';
+  showroomExpenseInfo.innerHTML=`الرصيد الحالي للمعرض: <b>${money(t.remaining)}</b> ج.م — المصروف سيُسجل كخروج من الخزنة ويخصم من رصيد المعرض.`;
+  showroomExpenseBox.classList.remove('hidden');
+}
+function closeShowroomExpense(){showroomExpenseBox.classList.add('hidden')}
+function saveShowroomExpense(){
+  const amt=roundWhole(sea.value);
+  if(amt<=0)return alert('اكتب مبلغ مصروف صحيح بالجنيه.');
+  const t=showroomProfitTotals();
+  if(amt>t.remaining)return alert(`مبلغ المصروف أكبر من رصيد المعرض المتاح. المتاح: ${money(t.remaining)} ج.م`);
+  const date=sed.value||new Date().toISOString().slice(0,10);
+  const desc=String(sen.value||set.value||'مصاريف المعرض').trim();
+  const cash=A('حركة الخزنة'),bal=cashBalance();
+  cash.push({'id':nextLocalId('حركة الخزنة'),'التاريخ':date,'نوع الحركة':'مصاريف المعرض','العربية/البند':String(set.value||'مصاريف المعرض'),'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':bal-amt,'ملاحظات':'[SHOWROOM-EXPENSE] '+desc});
+  save(); closeShowroomExpense(); renderAll(); renderShowroomWithdrawSummary();
+  if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل مصروف المعرض';
+  alert('تم تسجيل مصروف المعرض وتحديث الخزنة ورصيد المعرض.');
+}
 function cashModal(){cd.value=new Date().toISOString().slice(0,10);ct.value='';ci.value='';ca.value='';cin.value=0;cout.value=0;cn.value='';cashBox.classList.remove('hidden')}
 function closeCash(){cashBox.classList.add('hidden')}
 function saveCash(){
@@ -1723,7 +1762,7 @@ function saveCash(){
   save();closeCash();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تحديث الخزنة';
 }
 function backup(){let b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='TN-Auto-System-backup.json';a.click()}
-function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{S=JSON.parse(r.result);save();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الاسترجاع';alert('تم الاسترجاع')}catch{alert('ملف غير صالح')}};r.readAsText(f)}
+function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{const parsed=JSON.parse(r.result);const required=['العربيات','الشركاء','مساهمات العربيات','حركة الخزنة','طلبات العملاء','الموظفين','حركة الموظفين','حركة الشركاء','ربح المعرض','مبالغ تسترد','العملاء'];if(!parsed||typeof parsed!=='object'||required.some(k=>!Array.isArray(parsed[k])))throw new Error('schema');for(const k of required){if(parsed[k].some(x=>!x||typeof x!=='object'||Array.isArray(x)))throw new Error('rows')}S=parsed;save();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الاسترجاع';alert('تم الاسترجاع بنجاح')}catch{alert('ملف النسخة الاحتياطية غير صالح أو لا يطابق بنية TN Auto الحالية. لم يتم تغيير البيانات.')}};r.readAsText(f)}
 renderAll();
 </script>
 <script id="mobile-fix-js">
