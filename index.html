@@ -1483,7 +1483,7 @@ async function saveAdditionalDeposit(){
 }
 function withdrawModal(){wp.innerHTML=A('الشركاء').map(p=>`<option>${esc(p['الشريك'])}</option>`).join('');wd.value=new Date().toISOString().slice(0,10);wa.value='';wst.value='سحب شريك';wn.value='';wdBox.classList.remove('hidden');}
 function closeWd(){wdBox.classList.add('hidden')}
-function saveWithdraw(){
+async function saveWithdraw(){
   let partnerName=wp.value,amt=Number(wa.value)||0;
   if(!partnerName||amt<=0)return alert('اختار الشريك واكتب المبلغ');
   let partner=A('الشركاء').find(p=>p['الشريك']===partnerName);
@@ -1494,7 +1494,40 @@ function saveWithdraw(){
   partner['إجمالي المبلغ المسجل']=current-amt;
   partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
   A('حركة الشركاء').push({'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':current-amt});
-  save(); closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب'; alert('تم تسجيل السحب وتحديث رصيد الشريك');
+  // السحب يجب أن يكون عملية محاسبية واحدة: تحديث الشريك + حركة شريك + خروج نقدية أونلاين.
+  if(onlineMode && sb){
+    try{
+      const partnerId=Number(partner.id)||null;
+      if(!partnerId) throw new Error('معرّف الشريك غير موجود');
+      const [{data:ptRows,error:ptErr},{data:cashRows,error:cashErr}]=await Promise.all([
+        sb.from('partner_transactions').select('id').order('id',{ascending:false}).limit(1),
+        sb.from('cash_transactions').select('id').order('id',{ascending:false}).limit(1)
+      ]);
+      if(ptErr) throw ptErr; if(cashErr) throw cashErr;
+      const txId=(Number(ptRows?.[0]?.id)||0)+1;
+      const cashId=(Number(cashRows?.[0]?.id)||0)+1;
+      const partnerRow={id:partnerId,name:String(partner['الشريك']||''),capital:Number(partner['إجمالي المبلغ المسجل'])||0,base_capital:Number(partner['رأس المال الأساسي'])||0};
+      const txRow={id:txId,partner_id:partnerId,type:'withdrawal',amount:amt,car_id:null,description:wst.value||'سحب شريك',transaction_date:date};
+      const cashRow={id:cashId,type:'expense',amount:amt,description:'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك'),partner_id:partnerId,car_id:null,transaction_date:date};
+      const pr=await sb.from('partners').upsert(partnerRow,{onConflict:'id'}).select('id,capital,base_capital').single();
+      if(pr.error) throw pr.error;
+      if(!pr.data || Number(pr.data.id)!==partnerId || Number(pr.data.capital)!==Number(partnerRow.capital)) throw new Error('لم يتم تأكيد تحديث رصيد الشريك على السحابة');
+      const tx=await sb.from('partner_transactions').upsert(txRow,{onConflict:'id'}).select('id').single();
+      if(tx.error) throw tx.error;
+      const cr=await sb.from('cash_transactions').upsert(cashRow,{onConflict:'id'}).select('id').single();
+      if(cr.error) throw cr.error;
+      window.__cloudSnapshot={...(window.__cloudSnapshot||{}),partners:A('الشركاء').map((r,i)=>({id:Number(r.id)||i+1,name:String(r['الشريك']||''),capital:Number(r['إجمالي المبلغ المسجل'])||0,base_capital:Number(r['رأس المال الأساسي'])||Number(r['إجمالي المبلغ المسجل'])||0})),cash:A('حركة الخزنة').map((r,i)=>({id:Number(r.id)||i+1,type:(Number(r['داخل'])||0)>0?'income':'expense',amount:Math.abs((Number(r['داخل'])||0)-(Number(r['خارج'])||0)),description:r['ملاحظات']||r['العربية/البند']||null,partner_id:Number(r['partner_id'])||null,car_id:Number(r['car_id'])||null,transaction_date:r['التاريخ']||date})),partner_transactions:A('حركة الشركاء')};
+      localStorage.setItem(KEY,JSON.stringify(S));
+      closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب أونلاين'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة أونلاين');
+      return;
+    }catch(e){
+      console.error('Direct partner withdrawal sync failed:',e);
+      if(typeof sysStatus!=='undefined')sysStatus.textContent='خطأ مزامنة السحب';
+      alert('تم تسجيل السحب محليًا، لكن لم يتم تأكيد حفظه أونلاين. جرّب الحفظ مرة أخرى بعد التأكد من الاتصال.');
+      return;
+    }
+  }
+  save(); closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة');
 }
 function showroomProfitTotals(){
   // ربح المعرض يجب أن يظهر بنفس الرقم على كل جهاز. لذلك لا نعتمد على
