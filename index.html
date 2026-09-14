@@ -144,6 +144,7 @@ async function syncFromCloud(showAlert=true){
 
 <script>
 let cloudSyncTimer=null;
+let __partnerCashBusy=false;
 function queueCloudSync(){
   clearTimeout(cloudSyncTimer);
   cloudSyncTimer=setTimeout(()=>syncLocalToCloud().catch(e=>{
@@ -1441,6 +1442,8 @@ async function saveAdditionalDeposit(){
   const date=wd.value||new Date().toISOString().slice(0,10);
 
   if(onlineMode && sb){
+    if(__partnerCashBusy)return alert('جاري تنفيذ حركة مالية، انتظر لحظات.');
+    __partnerCashBusy=true;
     try{
       const partnerId=Number(partner.id)||null;
       if(!partnerId) throw new Error('معرّف الشريك غير موجود');
@@ -1459,14 +1462,20 @@ async function saveAdditionalDeposit(){
       partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
       A('حركة الشركاء').push({'id':Number(data.partner_transaction_id),'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'إضافة','البيان':wst.value||'إيداع إضافي لرأس المال','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':amt,'السحب الكلي':0,'الرصيد':Number(partner['إجمالي المبلغ المسجل'])||0});
       A('حركة الخزنة').push({'id':Number(data.cash_transaction_id),'التاريخ':date,'نوع الحركة':'إضافة رأس مال شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':amt,'خارج':0,'الرصيد':cashBalance()+amt,'ملاحظات':'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),'partner_id':partnerId,'car_id':null});
-      window.__cloudSnapshot=null;
+      const snap=window.__cloudSnapshot||{};
+      if(Array.isArray(snap.partners)) snap.partners=snap.partners.map(r=>Number(r.id)===partnerId?{...r,capital:Number(data.capital),base_capital:Number(data.base_capital)}:r);
+      if(Array.isArray(snap.partner_transactions)) snap.partner_transactions=[...snap.partner_transactions,{id:Number(data.partner_transaction_id),partner_id:partnerId,type:'deposit',amount:amt,car_id:null,description:wst.value||'إيداع إضافي لرأس المال',transaction_date:date}];
+      if(Array.isArray(snap.cash)) snap.cash=[...snap.cash,{id:Number(data.cash_transaction_id),type:'income',amount:amt,description:'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),partner_id:partnerId,car_id:null,transaction_date:date}];
+      window.__cloudSnapshot=snap;
       localStorage.setItem(KEY,JSON.stringify(S));
       closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل الإيداع أونلاين'; alert('تم تسجيل الإيداع وتحديث رصيد الشريك والخزنة أونلاين');
+      __partnerCashBusy=false;
       return;
     }catch(e){
       console.error('Atomic partner deposit failed:',e);
       if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ الإيداع';
       alert('لم يتم تسجيل الإيداع أونلاين، ولم يتم تغيير الرصيد أو الخزنة.\n\n'+(e.message||e));
+      __partnerCashBusy=false;
       return;
     }
   }
@@ -1490,6 +1499,8 @@ async function saveWithdraw(){
   const date=wd.value||new Date().toISOString().slice(0,10);
 
   if(onlineMode && sb){
+    if(__partnerCashBusy)return alert('جاري تنفيذ حركة مالية، انتظر لحظات.');
+    __partnerCashBusy=true;
     try{
       const partnerId=Number(partner.id)||null;
       if(!partnerId) throw new Error('معرّف الشريك غير موجود');
@@ -1508,14 +1519,20 @@ async function saveWithdraw(){
       partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
       A('حركة الشركاء').push({'id':Number(data.partner_transaction_id),'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':Number(partner['إجمالي المبلغ المسجل'])});
       A('حركة الخزنة').push({'id':Number(data.cash_transaction_id),'التاريخ':date,'نوع الحركة':'سحب شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':cashBalance()-amt,'ملاحظات':'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك'),'partner_id':partnerId,'car_id':null});
-      window.__cloudSnapshot=null;
+      const snap=window.__cloudSnapshot||{};
+      if(Array.isArray(snap.partners)) snap.partners=snap.partners.map(r=>Number(r.id)===partnerId?{...r,capital:Number(data.capital),base_capital:Number(data.base_capital)}:r);
+      if(Array.isArray(snap.partner_transactions)) snap.partner_transactions=[...snap.partner_transactions,{id:Number(data.partner_transaction_id),partner_id:partnerId,type:'withdrawal',amount:amt,car_id:null,description:wst.value||'سحب شريك',transaction_date:date}];
+      if(Array.isArray(snap.cash)) snap.cash=[...snap.cash,{id:Number(data.cash_transaction_id),type:'expense',amount:amt,description:'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك'),partner_id:partnerId,car_id:null,transaction_date:date}];
+      window.__cloudSnapshot=snap;
       localStorage.setItem(KEY,JSON.stringify(S));
       closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب أونلاين'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة أونلاين');
+      __partnerCashBusy=false;
       return;
     }catch(e){
       console.error('Atomic partner withdrawal failed:',e);
       if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ السحب';
       alert('لم يتم تسجيل السحب أونلاين، ولم يتم تغيير الرصيد أو الخزنة.\n\n'+(e.message||e));
+      __partnerCashBusy=false;
       return;
     }
   }
