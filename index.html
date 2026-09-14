@@ -103,7 +103,7 @@ function applyCloudSnapshot(s){
       const key=legacy ? `${r.transaction_date||''}|${amt}|${desc}` : '';
       if(legacy && seenLegacy.has(key)) continue;
       if(legacy) seenLegacy.add(key);
-      mapped.push({id:r.id,'التاريخ':r.transaction_date||'', 'نوع الحركة':r.type==='income'?'دخل':'مصروف','العربية/البند':desc,'المبلغ':amt,'داخل':r.type==='income'?amt:0,'خارج':r.type==='expense'?amt:0,'ملاحظات':desc});
+      mapped.push({id:r.id,'التاريخ':r.transaction_date||'', 'نوع الحركة':r.type==='income'?'دخل':'مصروف','العربية/البند':desc,'المبلغ':amt,'داخل':r.type==='income'?amt:0,'خارج':r.type==='expense'?amt:0,'ملاحظات':desc,'partner_id':r.partner_id??null,'car_id':r.car_id??null});
     }
     S['حركة الخزنة']=mapped;
   }
@@ -1461,11 +1461,12 @@ async function saveAdditionalDeposit(){
       const txRow={id:txId,partner_id:partnerId,type:'deposit',amount:amt,car_id:null,description:wst.value||'إيداع إضافي لرأس المال',transaction_date:date};
       const cashRow={id:cashId,type:'income',amount:amt,description:'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),partner_id:partnerId,car_id:null,transaction_date:date};
       // احفظ الحساب الأساسي أولًا، ثم سجل الحركةين. أي فشل يُظهر السبب بدل نجاح كاذب.
-      const pr=await sb.from('partners').upsert(partnerRow,{onConflict:'id'});
+      const pr=await sb.from('partners').upsert(partnerRow,{onConflict:'id'}).select('id,capital,base_capital').single();
       if(pr.error)throw pr.error;
-      const tx=await sb.from('partner_transactions').upsert(txRow,{onConflict:'id'});
+      if(!pr.data || Number(pr.data.id)!==partnerId || Number(pr.data.capital)!==Number(partnerRow.capital)) throw new Error('لم يتم تأكيد تحديث رصيد الشريك على السحابة');
+      const tx=await sb.from('partner_transactions').upsert(txRow,{onConflict:'id'}).select('id').single();
       if(tx.error)throw tx.error;
-      const cr=await sb.from('cash_transactions').upsert(cashRow,{onConflict:'id'});
+      const cr=await sb.from('cash_transactions').upsert(cashRow,{onConflict:'id'}).select('id').single();
       if(cr.error)throw cr.error;
       window.__cloudSnapshot={...(window.__cloudSnapshot||{}),partners:A('الشركاء').map((r,i)=>({id:Number(r.id)||i+1,name:String(r['الشريك']||''),capital:Number(r['إجمالي المبلغ المسجل'])||0,base_capital:Number(r['رأس المال الأساسي'])||Number(r['إجمالي المبلغ المسجل'])||0})),cash:A('حركة الخزنة').map((r,i)=>({id:Number(r.id)||i+1,type:(Number(r['داخل'])||0)>0?'income':'expense',amount:Math.abs((Number(r['داخل'])||0)-(Number(r['خارج'])||0)),description:r['ملاحظات']||r['العربية/البند']||null,partner_id:Number(r['partner_id'])||null,car_id:Number(r['car_id'])||null,transaction_date:r['التاريخ']||date})),partner_transactions:A('حركة الشركاء')};
       localStorage.setItem(KEY,JSON.stringify(S));
