@@ -1021,10 +1021,11 @@ function rebuildCarContributions(){
 async function saveModal(){
  const isNew = ctx.index == null;
  let obj={};fields[ctx.type].forEach(([l])=>obj[l]=document.getElementById('f_'+l).value);
+ let pcs=[];
  if(ctx.type==='request' && !obj.id){ obj.id=Date.now(); }
  if(ctx.type==='car'){
  obj['دفع من الخزنة?']=document.getElementById('f_دفع_من_الخزنة؟')?.value||'نعم';
- const pcs=[...document.querySelectorAll('.pc')].map(x=>({name:x.dataset.partner,amount:Number(x.value)||0})).filter(x=>x.amount>0);
+ pcs=[...document.querySelectorAll('.pc')].map(x=>({name:x.dataset.partner,amount:Number(x.value)||0})).filter(x=>x.amount>0);
  const purchase=Number(obj['سعر الشراء'])||0,total=pcs.reduce((a,x)=>a+x.amount,0);
  if(total-purchase>0.01){alert('إجمالي مساهمات الشركاء لا يمكن أن يتجاوز سعر الشراء.\nسعر الشراء: '+money(purchase)+'\nالمساهمات: '+money(total));return;}
  obj['مساهمات الشركاء']=pcs.map(x=>x.name+': '+x.amount).join(' | ');
@@ -1039,7 +1040,6 @@ async function saveModal(){
  setVehicleSalesInfo(obj,vi);
 }
  if(ctx.type==='car'){
-   const pcs=[...document.querySelectorAll('.pc')].map(x=>({name:x.dataset.partner,amount:Number(x.value)||0})).filter(x=>x.amount>0);
    const oldCar=ctx.index!=null?A('العربيات')[ctx.index]:null;
    if(!isNew && oldCar && sold(oldCar)){
      const oldSale=Number(oldCar['سعر البيع'])||0, newSale=Number(obj['سعر البيع'])||0, oldCom=Number(oldCar['عمولة البيع'])||0, newCom=Number(obj['عمولة البيع'])||0;
