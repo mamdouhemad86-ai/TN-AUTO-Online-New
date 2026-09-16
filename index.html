@@ -1022,7 +1022,6 @@ async function saveModal(){
  const isNew = ctx.index == null;
  let obj={};fields[ctx.type].forEach(([l])=>obj[l]=document.getElementById('f_'+l).value);
  let carPcs=[];
- let pendingCarContributions=null;
  if(ctx.type==='request' && !obj.id){ obj.id=Date.now(); }
  if(ctx.type==='car'){
  obj['دفع من الخزنة?']=document.getElementById('f_دفع_من_الخزنة؟')?.value||'نعم';
@@ -1190,7 +1189,7 @@ async function saveModal(){
        const savedCar=A('العربيات')[ctx.index];
        const carId=Number(obj.id||savedCar?.id)||0;
        await saveCarContributionsOnline(carId,pendingCarContributions||[]);
-       const partnerPaid=Number(pendingCarContributions||[]).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+       const partnerPaid=(pendingCarContributions||[]).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
        const remainingToPurchase=Math.max(0,Number(obj['سعر الشراء'])||0)-partnerPaid;
        if(remainingToPurchase>0.01){
          alert('تم حفظ مساهمات الشركاء بنجاح.\n\nإجمالي مساهمات الشركاء في العربية: '+money(partnerPaid)+' ج.م\nسعر شراء العربية: '+money(Number(obj['سعر الشراء'])||0)+' ج.م\nالمتبقي لتغطية سعر العربية: '+money(remainingToPurchase)+' ج.م\n\nالمتبقي يمكن أن يغطيه المعرض أو يمكنك إضافة شريك آخر.');
