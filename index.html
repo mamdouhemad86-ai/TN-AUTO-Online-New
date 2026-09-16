@@ -556,15 +556,18 @@ function partnerStats(p){
   const capital=Number(p['إجمالي المبلغ المسجل'])||0;
   const baseCapital=Number(p['رأس المال الأساسي'])||capital;
 
-  // «خارج المساهمة» في النظام تعني نقدية رأس المال المتبقية خارج العربيات.
-  // partners.capital هو الرصيد الرأسمالي الحالي بعد السحوبات، بينما أرباح البيع
-  // معروضة بشكل مستقل في بطاقة «الأرباح المستحقة» ولا تُضاف مرة ثانية إلى هذه الخانة.
-  // لذلك: خارج المساهمة = رأس المال الحالي - المبلغ المربوط بعربيات غير مباعة.
+  // النقدية خارج المساهمة تُحسب من الرصيد الرأسمالي الحالي الفعلي للشريك،
+  // ثم نضيف فقط الأرباح التي لم تُستهلك بسحوبات تجاوزت رأس المال الأساسي.
+  // هذا مهم لأن partners.capital في السحابة يحمل أثر السحوبات القديمة حتى
+  // لو كانت بعض حركات السحب التاريخية غير موجودة في partner_transactions.
   const withdrawals=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:0),0);
   const capitalNow=Math.max(0,capital);
-  const undistributed=Math.max(0,capitalNow-invested);
-  // الرصيد النهائي يعرض رأس المال الحالي + الأرباح المستحقة غير المسحوبة.
-  const finalBalance=Math.max(0,capitalNow+profit);
+  const withdrawnProfit=Math.max(0,withdrawals-baseCapital);
+  const unwithdrawnProfit=Math.max(0,profit-withdrawnProfit);
+  const finalBalance=Math.max(0,capitalNow+unwithdrawnProfit);
+  // خارج المساهمة = النقدية الرأسمالية المتبقية + الأرباح غير المسحوبة
+  // ناقص ما هو مربوط حاليًا بعربيات غير مباعة.
+  const undistributed=Math.max(0,capitalNow-invested+unwithdrawnProfit);
 
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
 }
@@ -1629,8 +1632,8 @@ async function saveWithdraw(){
   const partner=A('الشركاء').find(p=>p['الشريك']===partnerName);
   if(!partner)return alert('الشريك غير موجود');
   const st=partnerStats(partner);
-  const current=Math.max(0,Number(st.undistributed)||0);
-  if(amt>current)return alert('مبلغ السحب أكبر من الرصيد غير المساهم المتاح للشريك ('+money(current)+')');
+  const current=Math.max(0,Number(st.finalBalance)||0);
+  if(amt>current)return alert('مبلغ السحب أكبر من الرصيد النهائي المتاح للشريك ('+money(current)+')');
   const date=wd.value||new Date().toISOString().slice(0,10);
 
   if(onlineMode && sb){
@@ -1672,10 +1675,9 @@ async function saveWithdraw(){
     }
   }
 
-  const capitalBefore=Number(partner['إجمالي المبلغ المسجل'])||0;
-  partner['إجمالي المبلغ المسجل']=Math.max(0,capitalBefore-amt);
-  partner['غير موزع']=Math.max(0,Number(partner['إجمالي المبلغ المسجل'])-(Number(partner['الموزع على العربيات'])||0));
-  A('حركة الشركاء').push({'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':Number(partner['إجمالي المبلغ المسجل'])});
+  partner['إجمالي المبلغ المسجل']=current-amt;
+  partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
+  A('حركة الشركاء').push({'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':current-amt});
   A('حركة الخزنة').push({'التاريخ':date,'نوع الحركة':'سحب شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':cashBalance()-amt,'ملاحظات':'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك')});
   save(); closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة');
 }
