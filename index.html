@@ -959,6 +959,50 @@ function closeModal(){modalbox.classList.add('hidden');ctx=null}
 function nextLocalId(sheet){
  const rows=A(sheet); return rows.reduce((m,r)=>Math.max(m,Number(r.id)||0),0)+1;
 }
+async function saveCarContributionsOnline(carId, pcs){
+  if(!onlineMode || !sb || carId==null) return;
+  const cid=Number(carId)||0;
+  if(!cid) return;
+  const partnerMap=new Map(A('الشركاء').map(p=>[String(p['الشريك']),Number(p.id)||null]));
+  const desired=(pcs||[]).filter(x=>(Number(x.amount)||0)>0).map(x=>({
+    partner_id: partnerMap.get(String(x.name)) || null,
+    partner_name: String(x.name||''),
+    amount: Number(x.amount)||0
+  })).filter(x=>x.partner_id);
+  const {data:remote,error:readErr}=await sb.from('car_contributions').select('id,car_id,partner_id,partner_name,amount').eq('car_id',cid);
+  if(readErr) throw readErr;
+  const remoteByPartner=new Map((remote||[]).map(r=>[String(r.partner_id),r]));
+  const desiredIds=[];
+  for(const d of desired){
+    const old=remoteByPartner.get(String(d.partner_id));
+    if(old){
+      desiredIds.push(old.id);
+      if(Number(old.amount)!==Number(d.amount) || String(old.partner_name||'')!==d.partner_name){
+        const {error:e}=await sb.from('car_contributions').update({partner_name:d.partner_name,amount:d.amount}).eq('id',old.id);
+        if(e) throw e;
+      }
+    }else{
+      const {data:ins,error:e}=await sb.from('car_contributions').insert({car_id:cid,partner_id:d.partner_id,partner_name:d.partner_name,amount:d.amount}).select('id').single();
+      if(e) throw e;
+      if(ins?.id!=null) desiredIds.push(ins.id);
+    }
+  }
+  const remove=(remote||[]).filter(r=>!desiredIds.includes(r.id)).map(r=>r.id);
+  if(remove.length){
+    const {error:e}=await sb.from('car_contributions').delete().in('id',remove);
+    if(e) throw e;
+  }
+  // Re-read the authoritative rows so the local snapshot carries the same IDs/amounts.
+  const {data:fresh,error:freshErr}=await sb.from('car_contributions').select('id,car_id,partner_id,partner_name,amount').eq('car_id',cid);
+  if(freshErr) throw freshErr;
+  const local=A('مساهمات العربيات');
+  const others=local.filter(r=>String(r.car_id)!==String(cid));
+  const mapped=(fresh||[]).map(r=>({id:r.id,car_id:r.car_id,الشريك:r.partner_name||'',المبلغ:Number(r.amount)||0,partner_id:r.partner_id||null}));
+  S['مساهمات العربيات']=[...others,...mapped];
+  window.__cloudSnapshot={...(window.__cloudSnapshot||{}),contrib:[...(window.__cloudSnapshot?.contrib||[]).filter(r=>String(r.car_id)!==String(cid)),...(fresh||[])]};
+  localStorage.setItem(KEY,JSON.stringify(S));
+}
+
 function rebuildCarContributions(){
  const old=A('مساهمات العربيات'); const oldMap=new Map(old.map(r=>[String(r.car_id)+'|'+String(r.partner_id||r['الشريك']||''),r]));
  const out=[];
@@ -1125,7 +1169,20 @@ async function saveModal(){
      cash.push({'التاريخ':new Date().toISOString().slice(0,10),'نوع الحركة':'شراء عربية','العربية/البند':obj['العربية'],'المبلغ':amount,'داخل':0,'خارج':amount,'الرصيد':oldBal-amount,'ملاحظات':'[AUTO-PURCHASE] خصم تلقائي عند تسجيل العربية'});
    }
  }
- if(ctx.type==='car'){ rebuildCarContributions(); }
+ if(ctx.type==='car'){
+   rebuildCarContributions();
+   if(onlineMode && sb){
+     try{
+       const savedCar=A('العربيات')[ctx.index];
+       const carId=Number(obj.id||savedCar?.id)||0;
+       await saveCarContributionsOnline(carId,pcs);
+     }catch(e){
+       console.error('Cloud car contributions save error',e);
+       alert('تم تعديل المساهمات محليًا لكن تعذر حفظها أونلاين. لم يتم اعتماد التعديل على السحابة.\n\n'+(e.message||e));
+       return;
+     }
+   }
+ }
  if(ctx.type==='request' && onlineMode){
    // طلبات العملاء: ثبّت رقم الطلب واحفظه في قائمة معلقة قبل أي اتصال؛ حتى لا يختفي بعد refresh.
    if(!obj.id) obj.id=Date.now();
