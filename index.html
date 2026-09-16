@@ -1190,6 +1190,13 @@ async function saveModal(){
        const savedCar=A('العربيات')[ctx.index];
        const carId=Number(obj.id||savedCar?.id)||0;
        await saveCarContributionsOnline(carId,pendingCarContributions||[]);
+       const partnerPaid=Number(pendingCarContributions||[]).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+       const remainingToPurchase=Math.max(0,Number(obj['سعر الشراء'])||0)-partnerPaid;
+       if(remainingToPurchase>0.01){
+         alert('تم حفظ مساهمات الشركاء بنجاح.\n\nإجمالي مساهمات الشركاء في العربية: '+money(partnerPaid)+' ج.م\nسعر شراء العربية: '+money(Number(obj['سعر الشراء'])||0)+' ج.م\nالمتبقي لتغطية سعر العربية: '+money(remainingToPurchase)+' ج.م\n\nالمتبقي يمكن أن يغطيه المعرض أو يمكنك إضافة شريك آخر.');
+       }else{
+         alert('تم حفظ مساهمات الشركاء بنجاح.\n\nإجمالي مساهمات الشركاء: '+money(partnerPaid)+' ج.م\nمساهمات الشركاء تغطي سعر شراء العربية بالكامل.');
+       }
      }catch(e){
        console.error('Cloud car contributions save error',e);
        alert('تم تعديل المساهمات محليًا لكن تعذر حفظها أونلاين. لم يتم اعتماد التعديل على السحابة.\n\n'+(e.message||e));
