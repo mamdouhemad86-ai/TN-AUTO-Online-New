@@ -1623,8 +1623,9 @@ async function saveWithdraw(){
   if(!partnerName||amt<=0)return alert('اختار الشريك واكتب المبلغ');
   const partner=A('الشركاء').find(p=>p['الشريك']===partnerName);
   if(!partner)return alert('الشريك غير موجود');
-  const current=Number(partner['إجمالي المبلغ المسجل'])||0;
-  if(amt>current)return alert('مبلغ السحب أكبر من رصيد الشريك الحالي');
+  const st=partnerStats(partner);
+  const current=Math.max(0,Number(st.finalBalance)||0);
+  if(amt>current)return alert('مبلغ السحب أكبر من الرصيد النهائي المتاح للشريك ('+money(current)+')');
   const date=wd.value||new Date().toISOString().slice(0,10);
 
   if(onlineMode && sb){
