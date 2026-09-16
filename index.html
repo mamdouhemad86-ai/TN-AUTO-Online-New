@@ -511,7 +511,7 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset
 function table(sheet,head,body,search=''){let hs=h(sheet), q=search.toLowerCase(),all=A(sheet),rs=all.map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q)));document.getElementById(head).innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>إجراء</th></tr>';document.getElementById(body).innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td><button class="btn" onclick="edit('${sheet}',${i})">تعديل</button> <button class="btn danger" onclick="del('${sheet}',${i})">حذف</button></td></tr>`).join('')||`<tr><td colspan="${hs.length+1}" class="empty">لا توجد بيانات</td></tr>`}
 function cashBalance(){return A('حركة الخزنة').reduce((bal,x)=>bal+(Number(x['داخل'])||0)-(Number(x['خارج'])||0),0)}
 function recoverableTotal(){return A('مبالغ تسترد').reduce((sum,r)=>{const amount=Math.max(0,Number(r['المبلغ'])||0);const recovered=Math.min(amount,Math.max(0,Number(r['تم استرداده'])||0));r['المتبقي']=Math.max(0,amount-recovered);return sum+r['المتبقي'];},0)}
-function partnerFundsBalance(){return A('الشركاء').reduce((s,x)=>s+(Number(x['إجمالي المبلغ المسجل'])||0),0)}
+function partnerFundsBalance(){return A('الشركاء').reduce((s,x)=>s+partnerStats(x).finalBalance,0)}
 function partnerCashOutsideContribution(){return A('الشركاء').reduce((s,x)=>s+partnerStats(x).undistributed,0)}
 function inventoryCashValue(){return A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0)}
 function manualCashNet(){
