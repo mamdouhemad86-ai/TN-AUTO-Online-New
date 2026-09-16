@@ -568,10 +568,9 @@ function partnerStats(p){
   // هذا مهم لأن partners.capital في السحابة يحمل أثر السحوبات القديمة حتى
   // لو كانت بعض حركات السحب التاريخية غير موجودة في partner_transactions.
   const withdrawals=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:0),0);
-  // حقوق الشريك الحالية = رأس المال الأساسي + الإضافات + الأرباح - السحوبات.
-  // هذا الحساب مخصص لـ(غير المساهم) فقط، ولا نغيّر finalBalance حتى لا يتأثر
-  // رصيد الخزنة أو رأس المال المعروض في لوحة التحكم.
-  const rightsBalance=Math.max(0,baseCapital+deposits+profit-withdrawals);
+  // رأس المال الأساسي في هذا النظام يتضمن الإيداعات المسجلة بالفعل؛ لا نضيفها مرة أخرى.
+  // النقدية المتبقية هنا لا تغيّر finalBalance أو الخزنة أو لوحة رأس المال.
+  const rightsBalance=Math.max(0,baseCapital+profit-withdrawals);
   const capitalNow=Math.max(0,capital);
   const withdrawnProfit=Math.max(0,withdrawals-baseCapital);
   const unwithdrawnProfit=Math.max(0,profit-withdrawnProfit);
