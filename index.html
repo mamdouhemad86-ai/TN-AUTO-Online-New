@@ -557,10 +557,12 @@ function partnerStats(p){
   // المسحوبات تُحسب من الفرق بين رأس المال الأساسي والرصيد الحالي.
   // عرضها في التقرير لا ينقص الكاش مرة أخرى؛ حركة الخزنة هي التي تسجل الدفع الفعلي.
   const ledgerWithdrawals=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?(Number(x['المبلغ'])||0):0),0);
-  const inferredWithdrawals=Math.max(0,baseCapital-capital-profit);
-  const withdrawals=Math.max(inferredWithdrawals,ledgerWithdrawals);
+  const inferredWithdrawals=Math.max(0,baseCapital-capital);
+  const withdrawals=Math.max(0,inferredWithdrawals,ledgerWithdrawals);
   const undistributed=Math.max(0,capital-invested);
-  const finalBalance=capital+profit;
+  // الرصيد النهائي = رأس المال الأساسي الحالي (ويشمل الإضافات) + الأرباح - إجمالي السحوبات.
+  // لا نستخدم capital هنا لأنه بالفعل يتأثر بالسحوبات، وإلا سنخصم السحب مرتين.
+  const finalBalance=Math.max(0,baseCapital+profit-withdrawals);
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
 }
 function renderProfits(){
