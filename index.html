@@ -550,19 +550,25 @@ function partnerStats(p){
     });
   }
   const mv=A('حركة الشركاء').filter(x=>String(x['الشريك']||'')===name);
-  const profit=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='ربح'?Number(x['المبلغ'])||0:Number(x['ربح من العربيات'])||0),0);
-  const deposits=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='إضافة'?Number(x['المبلغ'])||0:Number(x['الإضافة الكلية'])||0),0);
+  const profit=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='ربح'?Number(x['المبلغ'])||0:Number(x['ربح من العربيات'])||0),0);
+  const deposits=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='إضافة'?Number(x['المبلغ'])||0:Number(x['الإضافة الكلية'])||0),0);
   const capital=Number(p['إجمالي المبلغ المسجل'])||0;
   const baseCapital=Number(p['رأس المال الأساسي'])||capital;
-  // المسحوبات تُحسب من الفرق بين رأس المال الأساسي والرصيد الحالي.
-  // عرضها في التقرير لا ينقص الكاش مرة أخرى؛ حركة الخزنة هي التي تسجل الدفع الفعلي.
-  const ledgerWithdrawals=mv.reduce((s,x)=>s+(String(x['نوع الحركة'])==='سحب'?(Number(x['المبلغ'])||0):0),0);
-  const inferredWithdrawals=Math.max(0,baseCapital-capital);
-  const withdrawals=Math.max(0,inferredWithdrawals,ledgerWithdrawals);
-  const undistributed=Math.max(0,capital-invested);
-  // الرصيد النهائي = رأس المال الأساسي الحالي (ويشمل الإضافات) + الأرباح - إجمالي السحوبات.
-  // لا نستخدم capital هنا لأنه بالفعل يتأثر بالسحوبات، وإلا سنخصم السحب مرتين.
-  const finalBalance=Math.max(0,baseCapital+profit-withdrawals);
+
+  // السحب الحقيقي هو حركات "سحب" المسجلة فقط.
+  // لا نحسب فرق baseCapital - capital كسحب؛ هذا الفرق قد يكون ناتجًا عن أموال ما زالت مستثمرة في العربيات.
+  const withdrawals=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:0),0);
+
+  // لو تجاوزت المسحوبات رأس المال الأساسي، فالجزء الزائد يُعتبر سحبًا من الأرباح.
+  // لذلك لا نضيف أرباحًا تم سحبها بالفعل إلى النقدية المتاحة.
+  const profitAlreadyWithdrawn=Math.max(0,withdrawals-baseCapital);
+  const unwithdrawnProfit=Math.max(0,profit-profitAlreadyWithdrawn);
+
+  // رأس المال الحالي يمثل أموال الشريك الحالية (نقد + استثمار سيارات)،
+  // والأرباح غير المسحوبة تُضاف إليه.
+  const finalBalance=Math.max(0,capital+unwithdrawnProfit);
+  const undistributed=Math.max(0,finalBalance-invested);
+
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
 }
 function renderProfits(){
