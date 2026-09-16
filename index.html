@@ -561,13 +561,17 @@ function partnerStats(p){
   // هذا مهم لأن partners.capital في السحابة يحمل أثر السحوبات القديمة حتى
   // لو كانت بعض حركات السحب التاريخية غير موجودة في partner_transactions.
   const withdrawals=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:0),0);
+  // حقوق الشريك الحالية = رأس المال الأساسي + الإضافات + الأرباح - السحوبات.
+  // هذا الحساب مخصص لـ(غير المساهم) فقط، ولا نغيّر finalBalance حتى لا يتأثر
+  // رصيد الخزنة أو رأس المال المعروض في لوحة التحكم.
+  const rightsBalance=Math.max(0,baseCapital+deposits+profit-withdrawals);
   const capitalNow=Math.max(0,capital);
   const withdrawnProfit=Math.max(0,withdrawals-baseCapital);
   const unwithdrawnProfit=Math.max(0,profit-withdrawnProfit);
   const finalBalance=Math.max(0,capitalNow+unwithdrawnProfit);
-  // خارج المساهمة = النقدية الرأسمالية المتبقية + الأرباح غير المسحوبة
-  // ناقص ما هو مربوط حاليًا بعربيات غير مباعة.
-  const undistributed=Math.max(0,capitalNow-invested+unwithdrawnProfit);
+  // غير المساهم = حقوق الشريك الحالية شامل الأرباح والمسحوبات - مساهمته الحالية
+  // في العربيات غير المباعة فقط.
+  const undistributed=Math.max(0,rightsBalance-invested);
 
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
 }
