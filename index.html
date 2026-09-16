@@ -512,6 +512,7 @@ function table(sheet,head,body,search=''){let hs=h(sheet), q=search.toLowerCase(
 function cashBalance(){return A('حركة الخزنة').reduce((bal,x)=>bal+(Number(x['داخل'])||0)-(Number(x['خارج'])||0),0)}
 function recoverableTotal(){return A('مبالغ تسترد').reduce((sum,r)=>{const amount=Math.max(0,Number(r['المبلغ'])||0);const recovered=Math.min(amount,Math.max(0,Number(r['تم استرداده'])||0));r['المتبقي']=Math.max(0,amount-recovered);return sum+r['المتبقي'];},0)}
 function partnerFundsBalance(){return A('الشركاء').reduce((s,x)=>s+partnerStats(x).finalBalance,0)}
+function partnerCashOutsideContribution(){return A('الشركاء').reduce((s,x)=>s+partnerStats(x).undistributed,0)}
 function inventoryCashValue(){return A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0)}
 function manualCashNet(){
  const excludedTypes=new Set(['الرصيد الافتتاحي المعتمد من لوحة التحكم','إضافة شريك','إضافة رأس مال شريك','سحب شريك','بيع عربية','شراء عربية','إرجاع بيع عربية','سحب ربح المعرض','إيداع كاش من المعرض','مصاريف المعرض','راتب موظف','سلفة موظف','مكافأة موظف','خصم موظف','مصروف موظف']);
@@ -555,19 +556,18 @@ function partnerStats(p){
   const capital=Number(p['إجمالي المبلغ المسجل'])||0;
   const baseCapital=Number(p['رأس المال الأساسي'])||capital;
 
-  // السحب الحقيقي هو حركات "سحب" المسجلة فقط.
-  // لا نحسب فرق baseCapital - capital كسحب؛ هذا الفرق قد يكون ناتجًا عن أموال ما زالت مستثمرة في العربيات.
+  // النقدية خارج المساهمة تُحسب من الرصيد الرأسمالي الحالي الفعلي للشريك،
+  // ثم نضيف فقط الأرباح التي لم تُستهلك بسحوبات تجاوزت رأس المال الأساسي.
+  // هذا مهم لأن partners.capital في السحابة يحمل أثر السحوبات القديمة حتى
+  // لو كانت بعض حركات السحب التاريخية غير موجودة في partner_transactions.
   const withdrawals=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:0),0);
-
-  // لو تجاوزت المسحوبات رأس المال الأساسي، فالجزء الزائد يُعتبر سحبًا من الأرباح.
-  // لذلك لا نضيف أرباحًا تم سحبها بالفعل إلى النقدية المتاحة.
-  const profitAlreadyWithdrawn=Math.max(0,withdrawals-baseCapital);
-  const unwithdrawnProfit=Math.max(0,profit-profitAlreadyWithdrawn);
-
-  // رأس المال الحالي يمثل أموال الشريك الحالية (نقد + استثمار سيارات)،
-  // والأرباح غير المسحوبة تُضاف إليه.
-  const finalBalance=Math.max(0,capital+unwithdrawnProfit);
-  const undistributed=Math.max(0,finalBalance-invested);
+  const capitalNow=Math.max(0,capital);
+  const withdrawnProfit=Math.max(0,withdrawals-baseCapital);
+  const unwithdrawnProfit=Math.max(0,profit-withdrawnProfit);
+  const finalBalance=Math.max(0,capitalNow+unwithdrawnProfit);
+  // خارج المساهمة = النقدية الرأسمالية المتبقية + الأرباح غير المسحوبة
+  // ناقص ما هو مربوط حاليًا بعربيات غير مباعة.
+  const undistributed=Math.max(0,capitalNow-invested+unwithdrawnProfit);
 
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
 }
@@ -921,7 +921,7 @@ function directPaymentModal(id){if(!onlineMode)return alert('التحصيل يح
 function closeDirectPayment(){document.getElementById('directPaymentBox')?.classList.add('hidden');__directPaymentId=null;}
 async function reverseDirectPayment(id){if(!onlineMode||!sb)return alert('التراجع عن التحصيل يحتاج اتصال أونلاين.');const p=A('تحصيلات الأقساط المباشرة').find(x=>Number(x.id)===Number(id));if(!p)return alert('عملية التحصيل غير موجودة.');const person=(A('أقساط مباشرة').find(x=>Number(x.id)===Number(p.installment_id))||{})['اسم الشخص']||'';const amt=Number(p['المبلغ'])||0;if(!confirm(`هل أنت متأكد من التراجع عن تحصيل ${money(amt)} ج.م من ${person}؟\n\nسيتم خصم المبلغ من الخزنة وإعادته إلى المتبقي على الشخص.`))return;try{const {data,error}=await sb.rpc('reverse_direct_installment_payment',{p_payment_id:Number(id)});if(error)throw error;await syncFromCloud(false);renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم التراجع عن التحصيل وإرجاع المبلغ للمتبقي';alert(`تم التراجع عن التحصيل بنجاح.\nالمبلغ: ${money(amt)} ج.م\nالمتبقي الآن: ${money(Number(data?.remaining_amount)||0)} ج.م`);}catch(e){console.error(e);alert('لم يتم التراجع عن التحصيل، ولم تتغير الخزنة.\n\n'+(e.message||e));}}
 async function saveDirectPayment(){if(!onlineMode||!sb)return alert('لا يوجد اتصال أونلاين.');const amt=roundWhole(document.getElementById('dpAmount').value),date=document.getElementById('dpDate').value||new Date().toISOString().slice(0,10),notes=String(document.getElementById('dpNotes').value||'').trim();if(amt<=0)return alert('اكتب مبلغ تحصيل صحيح.');if(!__directPaymentId)return;try{const {data,error}=await sb.rpc('record_direct_installment_payment',{p_installment_id:__directPaymentId,p_amount:amt,p_payment_date:date,p_notes:notes});if(error)throw error;await syncFromCloud(false);closeDirectPayment();renderAll();if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تحصيل القسط وإضافة المبلغ للخزنة';alert(`تم تحصيل ${money(amt)} ج.م وإضافتها للخزنة. المتبقي الآن: ${money(Number(data?.remaining_amount)||0)} ج.م`);}catch(e){console.error(e);alert('لم يتم تسجيل التحصيل، ولم تتغير الخزنة.\n\n'+(e.message||e));}}
-function renderAll(){renderDash();renderSalesPage();renderCustomersPage();renderCars();renderRequests();renderPartners();renderActiveContribTable();table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();renderShowroomDashboard();if(typeof renderShowroomDashboard==='function')renderShowroomDashboard();renderDirectInstallments();renderEmployees();const __fin=financialCashBalances();cashCurrent.textContent=money(__fin.book);if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
+function renderAll(){renderDash();renderSalesPage();renderCustomersPage();renderCars();renderRequests();renderPartners();renderActiveContribTable();table('حركة الخزنة','cashh','cashb');table('حركة الشركاء','mh','mb');table('مبالغ تسترد','rh','rb');renderProfits();renderShowroomWithdrawSummary();renderShowroomDashboard();if(typeof renderShowroomDashboard==='function')renderShowroomDashboard();renderDirectInstallments();renderEmployees();const __fin=financialCashBalances();cashCurrent.textContent=money(partnerCashOutsideContribution());if(typeof cashDeficit!=='undefined')cashDeficit.textContent=money(recoverableTotal());if(typeof cashReal!=='undefined')cashReal.textContent=money(__fin.real)}
 const fields={
 car:[['العربية','text'],['الموديل','number'],['السنة','number'],['اللون','text'],['العداد','number'],['المرور','text'],['الرخصة','text'],['سعر الشراء','number'],['عمولة الشراء','number'],['دفع من الخزنة؟','select','نعم|لا'],['مصدر العربية / المورد','text'],['رقم المورد','text'],['اسم العميل المشتري','text'],['رقم تليفون العميل','text'],['حالة البيع','select','لم تُسجل بيانات البيع بعد|تم الحجز|مباعة'],['سعر البيع','number'],['عمولة البيع','number'],['صافي الربح الحقيقي','number'],['ثلث المعرض','number'],['ثلثان للشركاء','number'],['ملاحظات','textarea']],
 request:[['التاريخ','date'],['اسم العميل','text'],['رقم التليفون','text'],['السيارة المطلوبة','text'],['الموديل','number'],['الميزانية','number'],['كاش/تقسيط','select','كاش|تقسيط'],['المقدم','number'],['اللون','text'],['الحالة','select','جديد|تم التواصل|بانتظار عربية|تم توفير عربية|تم البيع|مغلق'],['مسؤول الطلب','text'],['ملاحظات','textarea']],
