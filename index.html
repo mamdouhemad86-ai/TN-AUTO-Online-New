@@ -512,7 +512,13 @@ function table(sheet,head,body,search=''){let hs=h(sheet), q=search.toLowerCase(
 function cashBalance(){return A('حركة الخزنة').reduce((bal,x)=>bal+(Number(x['داخل'])||0)-(Number(x['خارج'])||0),0)}
 function recoverableTotal(){return A('مبالغ تسترد').reduce((sum,r)=>{const amount=Math.max(0,Number(r['المبلغ'])||0);const recovered=Math.min(amount,Math.max(0,Number(r['تم استرداده'])||0));r['المتبقي']=Math.max(0,amount-recovered);return sum+r['المتبقي'];},0)}
 function partnerFundsBalance(){return A('الشركاء').reduce((s,x)=>s+partnerStats(x).finalBalance,0)}
-function partnerCashOutsideContribution(){return A('الشركاء').reduce((s,x)=>s+partnerStats(x).undistributed,0)}
+function partnerCashOutsideContribution(){
+  // رصيد غير المساهم = حقوق الشركاء الحالية - مساهماتهم الحالية في العربيات.
+  // الأقساط المباشرة نشاط مستقل يؤثر على الخزنة والتحصيلات فقط، ولا يُخصم من حقوق الشركاء.
+  const rights=partnerFundsBalance();
+  const invested=inventoryCashValue();
+  return Math.max(0,rights-invested);
+}
 function inventoryCashValue(){return A('العربيات').filter(x=>!sold(x)).reduce((s,x)=>s+(Number(x['سعر الشراء'])||0),0)}
 function manualCashNet(){
  const excludedTypes=new Set(['الرصيد الافتتاحي المعتمد من لوحة التحكم','إضافة شريك','إضافة رأس مال شريك','سحب شريك','بيع عربية','شراء عربية','إرجاع بيع عربية','سحب ربح المعرض','إيداع كاش من المعرض','مصاريف المعرض','راتب موظف','سلفة موظف','مكافأة موظف','خصم موظف','مصروف موظف']);
@@ -570,8 +576,9 @@ function partnerStats(p){
   const withdrawnProfit=Math.max(0,withdrawals-baseCapital);
   const unwithdrawnProfit=Math.max(0,profit-withdrawnProfit);
   const finalBalance=Math.max(0,capitalNow+unwithdrawnProfit);
-  // غير المساهم = حقوق الشريك الحالية شامل الأرباح والمسحوبات - مساهمته الحالية
-  // في العربيات غير المباعة فقط.
+  // قيمة غير المساهم الخاصة بالشريك قبل خصم الأقساط المباشرة العامة.
+  // الأقساط المباشرة نشاط منفصل وغير منسوبة لشريك بعينه، لذلك تُخصم مرة واحدة
+  // على إجمالي بطاقة غير المساهم في partnerCashOutsideContribution().
   const undistributed=Math.max(0,rightsBalance-invested);
 
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
