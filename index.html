@@ -1148,7 +1148,7 @@ async function saveModal(){
    }
    return;
  }
- if(isNew){ if(ctx.type==='car' && !obj.id)obj.id=nextLocalId('العربيات'); a.push(obj); }else{ obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet); a[ctx.index]=obj; }
+ if(ctx.type!=='car'){ if(isNew){ obj.id=obj.id||nextLocalId(ctx.sheet); a.push(obj); }else{ obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet); a[ctx.index]=obj; }}
  if(ctx.type==='employee_tx' && isNew){
    const employee=A('الموظفين').find(e=>String(e['الموظف'])===String(obj['الموظف'])); if(!employee)return alert('الموظف غير موجود');
    const date=obj['التاريخ']||new Date().toISOString().slice(0,10),ym=String(date).slice(0,7),t=String(obj['نوع الحركة']||'');
@@ -1174,6 +1174,16 @@ async function saveModal(){
    }
  }
  if(ctx.type==='car'){
+   // Commit the edited car into S BEFORE rebuilding contributions.
+   // Otherwise rebuildCarContributions() sees the old car's contribution string,
+   // and the later generic sync can overwrite the freshly saved cloud rows with stale values.
+   if(isNew){
+     if(!obj.id) obj.id=nextLocalId('العربيات');
+     a.push(obj);
+   }else{
+     obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet);
+     a[ctx.index]=obj;
+   }
    rebuildCarContributions();
    if(onlineMode && sb){
      try{
