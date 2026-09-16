@@ -982,7 +982,7 @@ async function saveModal(){
  obj['دفع من الخزنة?']=document.getElementById('f_دفع_من_الخزنة؟')?.value||'نعم';
  const pcs=[...document.querySelectorAll('.pc')].map(x=>({name:x.dataset.partner,amount:Number(x.value)||0})).filter(x=>x.amount>0);
  const purchase=Number(obj['سعر الشراء'])||0,total=pcs.reduce((a,x)=>a+x.amount,0);
- if(pcs.length && Math.abs(total-purchase)>0.01){alert('إجمالي مساهمات الشركاء لازم يساوي سعر الشراء.\nسعر الشراء: '+money(purchase)+'\nالمساهمات: '+money(total));return;}
+ if(total-purchase>0.01){alert('إجمالي مساهمات الشركاء لا يمكن أن يتجاوز سعر الشراء.\nسعر الشراء: '+money(purchase)+'\nالمساهمات: '+money(total));return;}
  obj['مساهمات الشركاء']=pcs.map(x=>x.name+': '+x.amount).join(' | ');
  // التمويل يُفهم تلقائياً من المساهمات: بدون مساهمات = تمويل معرض 100%.
  const __purchaseFunding = {purchase:purchase,partnerFunded:total,showroomFunded:Math.max(0,purchase-total),type:total<=0?'showroom':Math.abs(total-purchase)<=0.01?'partners':'mixed'};
