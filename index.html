@@ -1022,6 +1022,7 @@ async function saveModal(){
  const isNew = ctx.index == null;
  let obj={};fields[ctx.type].forEach(([l])=>obj[l]=document.getElementById('f_'+l).value);
  let carPcs=[];
+ let pendingCarContributions=null;
  if(ctx.type==='request' && !obj.id){ obj.id=Date.now(); }
  if(ctx.type==='car'){
  obj['دفع من الخزنة?']=document.getElementById('f_دفع_من_الخزنة؟')?.value||'نعم';
@@ -1030,6 +1031,7 @@ async function saveModal(){
  if(total-purchase>0.01){alert('إجمالي مساهمات الشركاء لا يمكن أن يتجاوز سعر الشراء.\nسعر الشراء: '+money(purchase)+'\nالمساهمات: '+money(total));return;}
  obj['مساهمات الشركاء']=carPcs.map(x=>x.name+': '+x.amount).join(' | ');
  obj.__pendingCarContributions=carPcs;
+ pendingCarContributions=carPcs;
  // التمويل يُفهم تلقائياً من المساهمات: بدون مساهمات = تمويل معرض 100%.
  const __purchaseFunding = {purchase:purchase,partnerFunded:total,showroomFunded:Math.max(0,purchase-total),type:total<=0?'showroom':Math.abs(total-purchase)<=0.01?'partners':'mixed'};
  obj.__TN_FUNDING_TYPE=__purchaseFunding.type;
@@ -1039,7 +1041,7 @@ async function saveModal(){
  const vi={color:obj['اللون']||'',mileage:Number(obj['العداد'])||0,traffic:obj['المرور']||'',license:obj['الرخصة']||''};
  if(oldVehicle&&String(oldVehicle['ملاحظات']||'').includes('__TN_')){ /* preserve other internal sales markers while replacing vehicle info */ }
  setVehicleSalesInfo(obj,vi);
- delete obj.__pendingCarContributions;
+ // Keep pending contributions available to the later partner/accounting and cloud-save steps.
 }
  if(ctx.type==='car'){
    const oldCar=ctx.index!=null?A('العربيات')[ctx.index]:null;
@@ -1054,7 +1056,7 @@ async function saveModal(){
    for(const name of names){
      const partner=A('الشركاء').find(p=>p['الشريك']===name); if(!partner) continue;
      const current=Number(partner['الموزع على العربيات'])||0;
-     const corrected=current-(oldParts[name]||0)+((obj.__pendingCarContributions||[]).find(x=>x.name===name)?.amount||0);
+     const corrected=current-(oldParts[name]||0)+((pendingCarContributions||[]).find(x=>x.name===name)?.amount||0);
      partner['الموزع على العربيات']=corrected;
      partner['غير موزع']=(Number(partner['إجمالي المبلغ المسجل'])||0)-corrected;
    }
@@ -1177,7 +1179,7 @@ async function saveModal(){
      try{
        const savedCar=A('العربيات')[ctx.index];
        const carId=Number(obj.id||savedCar?.id)||0;
-       await saveCarContributionsOnline(carId,obj.__pendingCarContributions||[]);
+       await saveCarContributionsOnline(carId,pendingCarContributions||[]);
      }catch(e){
        console.error('Cloud car contributions save error',e);
        alert('تم تعديل المساهمات محليًا لكن تعذر حفظها أونلاين. لم يتم اعتماد التعديل على السحابة.\n\n'+(e.message||e));
