@@ -1688,15 +1688,15 @@ async function saveAdditionalDeposit(){
       if(error) throw error;
       if(!data || Number(data.partner_id)!==partnerId || Number(data.amount)!==amt) throw new Error('لم يتم تأكيد العملية المالية على السحابة');
 
-      partner['إجمالي المبلغ المسجل']=Number(data.capital)||((Number(partner['إجمالي المبلغ المسجل'])||0)+amt);
-      partner['رأس المال الأساسي']=Number(data.base_capital)||((Number(partner['رأس المال الأساسي'])||0)+amt);
+      partner['إجمالي المبلغ المسجل']=Number(partner['إجمالي المبلغ المسجل'])||((Number(partner['إجمالي المبلغ المسجل'])||0)+amt);
+      partner['رأس المال الأساسي']=Number(partner['رأس المال الأساسي'])||((Number(partner['رأس المال الأساسي'])||0)+amt);
       partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
-      A('حركة الشركاء').push({'id':Number(data.partner_transaction_id),'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'إضافة','البيان':wst.value||'إيداع إضافي لرأس المال','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':amt,'السحب الكلي':0,'الرصيد':Number(partner['إجمالي المبلغ المسجل'])||0});
-      A('حركة الخزنة').push({'id':Number(data.cash_transaction_id),'التاريخ':date,'نوع الحركة':'إضافة رأس مال شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':amt,'خارج':0,'الرصيد':cashBalance()+amt,'ملاحظات':'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),'partner_id':partnerId,'car_id':null});
+      A('حركة الشركاء').push({'id':partnerTransactionId,'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'إضافة','البيان':wst.value||'إيداع إضافي لرأس المال','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':amt,'السحب الكلي':0,'الرصيد':Number(partner['إجمالي المبلغ المسجل'])||0});
+      A('حركة الخزنة').push({'id':cashTransactionId,'التاريخ':date,'نوع الحركة':'إضافة رأس مال شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':amt,'خارج':0,'الرصيد':cashBalance()+amt,'ملاحظات':'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),'partner_id':partnerId,'car_id':null});
       const snap=window.__cloudSnapshot||{};
-      if(Array.isArray(snap.partners)) snap.partners=snap.partners.map(r=>Number(r.id)===partnerId?{...r,capital:Number(data.capital),base_capital:Number(data.base_capital)}:r);
-      if(Array.isArray(snap.partner_transactions)) snap.partner_transactions=[...snap.partner_transactions,{id:Number(data.partner_transaction_id),partner_id:partnerId,type:'deposit',amount:amt,car_id:null,description:wst.value||'إيداع إضافي لرأس المال',transaction_date:date}];
-      if(Array.isArray(snap.cash)) snap.cash=[...snap.cash,{id:Number(data.cash_transaction_id),type:'income',amount:amt,description:'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),partner_id:partnerId,car_id:null,transaction_date:date}];
+      if(Array.isArray(snap.partners)) snap.partners=snap.partners.map(r=>Number(r.id)===partnerId?{...r,capital:Number(partner['إجمالي المبلغ المسجل']),base_capital:Number(partner['رأس المال الأساسي'])}:r);
+      if(Array.isArray(snap.partner_transactions)) snap.partner_transactions=[...snap.partner_transactions,{id:partnerTransactionId,partner_id:partnerId,type:'deposit',amount:amt,car_id:null,description:wst.value||'إيداع إضافي لرأس المال',transaction_date:date}];
+      if(Array.isArray(snap.cash)) snap.cash=[...snap.cash,{id:cashTransactionId,type:'income',amount:amt,description:'[AUTO-PARTNER] '+(wn.value||'إيداع إضافي'),partner_id:partnerId,car_id:null,transaction_date:date}];
       window.__cloudSnapshot=snap;
       localStorage.setItem(KEY,JSON.stringify(S));
       closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل الإيداع أونلاين'; alert('تم تسجيل الإيداع وتحديث رصيد الشريك والخزنة أونلاين');
@@ -1744,17 +1744,28 @@ async function saveWithdraw(){
         p_cash_description:'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك')
       });
       if(error) throw error;
-      if(!data || Number(data.partner_id)!==partnerId || Number(data.amount)!==amt) throw new Error('لم يتم تأكيد العملية المالية على السحابة');
+      // PostgREST may return a single-row RPC result as an object or a one-item array.
+      const result=Array.isArray(data)?data[0]:data;
+      if(!result) throw new Error('السحابة لم تُرجع تأكيدًا للعملية');
+      const returnedPartnerId=Number(result.partner_id??result.p_partner_id);
+      const returnedAmount=Number(result.amount??result.p_amount);
+      if(returnedPartnerId && returnedPartnerId!==partnerId) throw new Error('تأكيد السحابة يخص شريكًا مختلفًا');
+      if(returnedAmount && returnedAmount!==amt) throw new Error('المبلغ المؤكد من السحابة لا يطابق مبلغ السحب');
+      const partnerTransactionId=Number(result.partner_transaction_id??result.partner_tx_id??result.partner_transactionid);
+      const cashTransactionId=Number(result.cash_transaction_id??result.cash_tx_id??result.cash_transactionid);
+      if(!partnerTransactionId || !cashTransactionId) throw new Error('السحابة لم تُرجع أرقام حركتي الشريك والخزنة؛ راجع الحركات قبل إعادة المحاولة');
+      const updatedCapital=Number(result.capital??result.updated_capital);
+      const updatedBaseCapital=Number(result.base_capital??result.updated_base_capital);
 
-      partner['إجمالي المبلغ المسجل']=Number(data.capital);
-      partner['رأس المال الأساسي']=Number(data.base_capital);
+      partner['إجمالي المبلغ المسجل']=Number.isFinite(updatedCapital)?updatedCapital:current-amt;
+      partner['رأس المال الأساسي']=Number.isFinite(updatedBaseCapital)?updatedBaseCapital:Number(partner['رأس المال الأساسي'])||current;
       partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
-      A('حركة الشركاء').push({'id':Number(data.partner_transaction_id),'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':Number(partner['إجمالي المبلغ المسجل'])});
-      A('حركة الخزنة').push({'id':Number(data.cash_transaction_id),'التاريخ':date,'نوع الحركة':'سحب شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':cashBalance()-amt,'ملاحظات':'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك'),'partner_id':partnerId,'car_id':null});
+      A('حركة الشركاء').push({'id':partnerTransactionId,'الشريك':partnerName,'التاريخ':date,'نوع الحركة':'سحب','البيان':wst.value||'سحب شريك','المبلغ':amt,'ربح من العربيات':0,'الإضافة الكلية':0,'السحب الكلي':amt,'الرصيد':Number(partner['إجمالي المبلغ المسجل'])});
+      A('حركة الخزنة').push({'id':cashTransactionId,'التاريخ':date,'نوع الحركة':'سحب شريك','العربية/البند':partnerName,'المبلغ':amt,'داخل':0,'خارج':amt,'الرصيد':cashBalance()-amt,'ملاحظات':'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك'),'partner_id':partnerId,'car_id':null});
       const snap=window.__cloudSnapshot||{};
-      if(Array.isArray(snap.partners)) snap.partners=snap.partners.map(r=>Number(r.id)===partnerId?{...r,capital:Number(data.capital),base_capital:Number(data.base_capital)}:r);
-      if(Array.isArray(snap.partner_transactions)) snap.partner_transactions=[...snap.partner_transactions,{id:Number(data.partner_transaction_id),partner_id:partnerId,type:'withdrawal',amount:amt,car_id:null,description:wst.value||'سحب شريك',transaction_date:date}];
-      if(Array.isArray(snap.cash)) snap.cash=[...snap.cash,{id:Number(data.cash_transaction_id),type:'expense',amount:amt,description:'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك'),partner_id:partnerId,car_id:null,transaction_date:date}];
+      if(Array.isArray(snap.partners)) snap.partners=snap.partners.map(r=>Number(r.id)===partnerId?{...r,capital:Number(partner['إجمالي المبلغ المسجل']),base_capital:Number(partner['رأس المال الأساسي'])}:r);
+      if(Array.isArray(snap.partner_transactions)) snap.partner_transactions=[...snap.partner_transactions,{id:partnerTransactionId,partner_id:partnerId,type:'withdrawal',amount:amt,car_id:null,description:wst.value||'سحب شريك',transaction_date:date}];
+      if(Array.isArray(snap.cash)) snap.cash=[...snap.cash,{id:cashTransactionId,type:'expense',amount:amt,description:'[AUTO-PARTNER-WITHDRAWAL] '+(wn.value||'سحب شريك'),partner_id:partnerId,car_id:null,transaction_date:date}];
       window.__cloudSnapshot=snap;
       localStorage.setItem(KEY,JSON.stringify(S));
       closeWd(); renderAll(); if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تسجيل السحب أونلاين'; alert('تم تسجيل السحب وتحديث رصيد الشريك والخزنة أونلاين');
