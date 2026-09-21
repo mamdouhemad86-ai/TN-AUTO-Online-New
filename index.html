@@ -1769,7 +1769,14 @@ async function saveWithdraw(){
     }catch(e){
       console.error('Atomic partner withdrawal failed:',e);
       if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ السحب';
-      alert('لم يتم تسجيل السحب أونلاين، ولم يتم تغيير الرصيد أو الخزنة.\n\n'+(e.message||e));
+      const details=[
+        e?.message || String(e),
+        e?.code ? 'Code: '+e.code : '',
+        e?.details ? 'Details: '+e.details : '',
+        e?.hint ? 'Hint: '+e.hint : '',
+        e?.status ? 'HTTP: '+e.status : ''
+      ].filter(Boolean).join('\n');
+      alert('فشل حفظ سحب الشريك. لم نعدّل الأرصدة محليًا.\n\nتفاصيل الخطأ:\n'+details+'\n\nقبل إعادة المحاولة، راجع حركة الشريك والخزنة للتأكد أن العملية لم تُسجّل.');
       __partnerCashBusy=false;
       return;
     }
