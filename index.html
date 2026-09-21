@@ -763,6 +763,8 @@ function renderPartnerDetailReport(){
   const partners=A('الشركاء');
   if(!partners.length){out.innerHTML='<div class="empty">لا يوجد شركاء</div>';return;}
   const options=partners.map((p,i)=>`<option value="${i}">${esc(p['الشريك'])}</option>`).join('');
+  // Rebuild the detail report from a clean container so a prior render cannot remain above it.
+  out.replaceChildren();
   out.innerHTML=`<div class="panel" style="margin-top:0"><div class="toolbar"><label style="font-size:12px;color:var(--muted);padding-top:10px">اختار الشريك</label><select id="partnerDetailSelect" class="search" onchange="showPartnerDetail(this.value)">${options}</select></div><div id="partnerDetailBody"></div></div>`;
   showPartnerDetail(0);
 }
@@ -784,12 +786,13 @@ function showPartnerDetail(index){
   html+=movementRows.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${esc(x['البيان']||'')}</td><td>${money(x['المبلغ'])}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">لا توجد حركة مسجلة</td></tr>';
   html+='</tbody></table></div></div>';
   // Replace the report content cleanly, then guard against duplicate summary/car-list blocks.
-  body.innerHTML='';
+  body.replaceChildren();
   body.innerHTML=html;
+  // Keep only the first summary and first cars table if duplicate nodes ever enter the report.
   const summaryBlocks=body.querySelectorAll(':scope > .cards');
-  summaryBlocks.forEach((el,i)=>{ if(i>0) el.remove(); });
+  for(let i=summaryBlocks.length-1;i>0;i--) summaryBlocks[i].remove();
   const carPanels=Array.from(body.children).filter(el=>el.querySelector('h3')?.textContent?.trim()==='فلوس الشريك الموجودة حاليًا في العربيات');
-  carPanels.forEach((el,i)=>{ if(i>0) el.remove(); });
+  for(let i=carPanels.length-1;i>0;i--) carPanels[i].remove();
 }
 function employeeMonthStats(employee, ym){
  const name=String(employee?.['الموظف']||''), base=Number(employee?.['الراتب الشهري'])||0;
