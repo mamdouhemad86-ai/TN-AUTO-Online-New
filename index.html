@@ -1721,10 +1721,17 @@ async function saveAdditionalDeposit(){
 function withdrawModal(){wp.innerHTML=A('الشركاء').map(p=>`<option>${esc(p['الشريك'])}</option>`).join('');wd.value=new Date().toISOString().slice(0,10);wa.value='';wst.value='سحب شريك';wn.value='';wdBox.classList.remove('hidden');}
 function closeWd(){wdBox.classList.add('hidden')}
 async function saveWithdraw(){
-  const partnerName=wp.value,amt=Number(wa.value)||0;
+  const partnerName=String(wp.value||'').trim(),amt=Number(wa.value)||0;
   if(!partnerName||amt<=0)return alert('اختار الشريك واكتب المبلغ');
-  const partner=A('الشركاء').find(p=>p['الشريك']===partnerName);
-  if(!partner)return alert('الشريك غير موجود');
+  // Match by database ID when the select stores an ID, or by normalized name
+  // when it stores the visible partner name (handles whitespace differences).
+  const normPartnerName=v=>String(v??'').normalize('NFKC').replace(/[\\u0640\\s\\u200e\\u200f]+/g,' ').trim().toLocaleLowerCase();
+  const partner=A('الشركاء').find(p=>
+    String(p.id??'')===partnerName ||
+    normPartnerName(p['الشريك'])===normPartnerName(partnerName) ||
+    normPartnerName(p.name)===normPartnerName(partnerName)
+  );
+  if(!partner)return alert('الشريك غير موجود في البيانات المحلية. حدّث الصفحة/المزامنة ثم جرّب مرة أخرى.');
   const st=partnerStats(partner);
   const current=Math.max(0,Number(st.finalBalance)||0);
   if(amt>current)return alert('مبلغ السحب أكبر من الرصيد النهائي المتاح للشريك ('+money(current)+')');
@@ -1746,12 +1753,12 @@ async function saveWithdraw(){
       if(error) throw error;
       // Supabase/PostgREST can expose a one-row RPC result as an object or array.
       const result=Array.isArray(data)?data[0]:data;
-      if(!result || typeof result!=='object') throw new Error('رد السحابة غير مفهوم؛ راجع الحركات قبل إعادة المحاولة.');
-      const partnerTxId=Number(result.partner_transaction_id);
-      const cashTxId=Number(result.cash_transaction_id);
-      if(!partnerTxId || !cashTxId) throw new Error('رد السحابة لا يحتوي معرفَي حركة الشريك والخزنة. راجع الحركات قبل إعادة المحاولة.');
-      const newCapital=Number(result.capital);
-      const newBaseCapital=Number(result.base_capital);
+      if(!result || typeof result!=='object') throw new Error('لم ترجع السحابة تفاصيل تأكيد السحب. راجع حركة الشريك والخزنة قبل إعادة المحاولة.');
+      const partnerTxId=Number(result.partner_transaction_id??result.partner_tx_id);
+      const cashTxId=Number(result.cash_transaction_id??result.cash_tx_id);
+      if(!partnerTxId || !cashTxId) throw new Error('تم استلام رد غير مكتمل من السحابة. راجع حركة الشريك والخزنة قبل إعادة المحاولة.');
+      const newCapital=Number(result.capital??result.updated_capital);
+      const newBaseCapital=Number(result.base_capital??result.updated_base_capital);
       partner['إجمالي المبلغ المسجل']=Number.isFinite(newCapital)?newCapital:current-amt;
       partner['رأس المال الأساسي']=Number.isFinite(newBaseCapital)?newBaseCapital:(Number(partner['رأس المال الأساسي'])||current);
       partner['غير موزع']=Math.max(0,(Number(partner['إجمالي المبلغ المسجل'])||0)-(Number(partner['الموزع على العربيات'])||0));
