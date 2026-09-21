@@ -774,17 +774,22 @@ function showPartnerDetail(index){
   html+='<div class="panel"><h3>فلوس الشريك الموجودة حاليًا في العربيات</h3><div class="tablewrap"><table class="table"><thead><tr><th>العربية</th><th>الموديل</th><th>مساهمة الشريك</th><th>نسبة المساهمة</th></tr></thead><tbody>';
   html+=st.currentCars.map(x=>{const total=Number(x.car['سعر الشراء'])||0;const pct=total?x.amount/total*100:0;return `<tr><td>${esc(x.car['العربية'])}</td><td>${esc(x.car['الموديل']||'')}</td><td>${money(x.amount)}</td><td>${pct.toFixed(2)}%</td></tr>`}).join('')||'<tr><td colspan="4" class="empty">لا توجد مساهمات حالية في عربيات موجودة</td></tr>';
   html+='</tbody></table></div></div>';
-  html+=
   html+='<div class="panel" style="margin-top:14px"><h3>حركة الشريك</h3><div class="tablewrap"><table class="table"><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>البيان</th><th>المبلغ</th></tr></thead><tbody>';
   const withdrawalRows=st.mv.filter(x=>String(x['نوع الحركة']||'')==='سحب').reduce((n,x)=>n+(Number(x['المبلغ'])||0),0);
   const inferredWithdrawal=Math.max(0,st.withdrawals-withdrawalRows);
   let movementRows=st.mv.slice();
   if(inferredWithdrawal>0){
-    movementRows.push({'التاريخ':'—','نوع الحركة':'سحب سابق','البيان':'فرق رأس المال الأساسي عن الرصيد الحالي (للتوضيح فقط — لا يخصم من الخزنة مرة أخرى)','المبلغ':inferredWithdrawal});
+    movementRows.push({'التاريخ':'—','نوع الحركة':'سحب سابق','البيان':'سحب سابق','المبلغ':inferredWithdrawal});
   }
   html+=movementRows.map(x=>`<tr><td>${esc(x['التاريخ']||'')}</td><td>${esc(x['نوع الحركة']||'')}</td><td>${esc(x['البيان']||'')}</td><td>${money(x['المبلغ'])}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">لا توجد حركة مسجلة</td></tr>';
   html+='</tbody></table></div></div>';
+  // Replace the report content cleanly, then guard against duplicate summary/car-list blocks.
+  body.innerHTML='';
   body.innerHTML=html;
+  const summaryBlocks=body.querySelectorAll(':scope > .cards');
+  summaryBlocks.forEach((el,i)=>{ if(i>0) el.remove(); });
+  const carPanels=Array.from(body.children).filter(el=>el.querySelector('h3')?.textContent?.trim()==='فلوس الشريك الموجودة حاليًا في العربيات');
+  carPanels.forEach((el,i)=>{ if(i>0) el.remove(); });
 }
 function employeeMonthStats(employee, ym){
  const name=String(employee?.['الموظف']||''), base=Number(employee?.['الراتب الشهري'])||0;
