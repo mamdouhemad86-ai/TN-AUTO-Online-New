@@ -543,43 +543,41 @@ function renderCarTableRows(rows,headId,bodyId,q,includeSoldReturn=false){const 
 function renderCars(){let q=(document.getElementById('cq')?.value||'');const cars=A('العربيات');const __notes=cars.map(c=>c['ملاحظات']);if(!tnIsManager())cars.forEach(c=>{c['ملاحظات']=cleanSalesNotes(c)});const available=cars.map((c,i)=>i).filter(i=>!sold(cars[i]));const soldCars=cars.map((c,i)=>i).filter(i=>sold(cars[i]));renderCarTableRows(available,'carh','carb',q,false);renderCarTableRows(soldCars,'carSoldH','carSoldB',q,true);cars.forEach((c,i)=>{if(!tnIsManager()&&__notes[i]!==undefined)c['ملاحظات']=__notes[i]});const set=(id,text)=>{const e=document.getElementById(id);if(e)e.textContent=text};set('carsAvailableCount',available.length+' معروض حالياً');set('carsAvailableCount2',available.length+' عربية');set('carsTotalCount',cars.length+' إجمالي العربيات');set('carsSoldCount',soldCars.length+' مباع');set('carsSoldCount2',soldCars.length+' عربية')}
 function renderRequests(){let q=(rq.value||''),hs=h('طلبات العملاء'),rs=A('طلبات العملاء').map((r,i)=>({r,i})).filter(x=>!q||Object.values(x.r).some(v=>String(v??'').toLowerCase().includes(q.toLowerCase())));reqh.innerHTML='<tr>'+hs.map(x=>`<th>${esc(x)}</th>`).join('')+'<th>مطابقة</th><th>إجراء</th></tr>';reqb.innerHTML=rs.map(({r,i})=>'<tr>'+hs.map(x=>`<td>${esc(r[x])}</td>`).join('')+`<td>${match(r).length?'<span class="tag ok">🔔 '+match(r).length+'</span>':'<span class="tag warn">لا توجد</span>'}</td><td><button class="btn" onclick="edit('طلبات العملاء',${i})">تعديل</button> <button class="btn danger" onclick="del('طلبات العملاء',${i})">حذف</button></td></tr>`).join('')||'<tr><td colspan="15" class="empty">لا توجد طلبات</td></tr>'}
 function partnerStats(p){
-  const name=String(p['الشريك']||'');
+  const name=String(p['الشريك']||'').trim();
   const partnerId=Number(p.id)||null;
   const cars=A('العربيات');
+  const carsById=new Map(cars.map(c=>[String(c.id),c]));
   const currentCars=[];
   let invested=0;
-  for(const c of cars){
-    if(sold(c)) continue;
-    const raw=String(c['مساهمات الشركاء']||'');
-    raw.split('|').map(x=>x.trim()).filter(Boolean).forEach(part=>{
-      const m=part.match(/^(.+?):\s*([\d.,]+)/); if(!m||m[1].trim()!==name)return;
-      const amount=Number(m[2].replace(/,/g,''))||0; if(amount<=0)return;
-      invested+=amount; currentCars.push({car:c,amount});
-    });
+
+  // مصدر الحقيقة للمساهمات هو جدول «مساهمات العربيات» (car_contributions)،
+  // وليس النص المخزن داخل سجل العربية. نستخدم الاسم كحل احتياطي للسجلات القديمة.
+  const contributions=A('مساهمات العربيات');
+  for(const row of contributions){
+    const rowPartnerId=Number(row.partner_id)||null;
+    const rowPartnerName=String(row['الشريك']||row.partner_name||'').trim();
+    const belongs=partnerId ? rowPartnerId===partnerId : rowPartnerName===name;
+    if(!belongs && !(rowPartnerId==null && rowPartnerName===name)) continue;
+    const car=carsById.get(String(row.car_id??row['معرف العربية']??''));
+    if(!car || sold(car)) continue;
+    const amount=Number(row['المبلغ']??row.amount)||0;
+    if(amount<=0) continue;
+    invested+=amount;
+    currentCars.push({car,amount});
   }
-  const mv=A('حركة الشركاء').filter(x=>String(x['الشريك']||'')===name);
+
+  const mv=A('حركة الشركاء').filter(x=>String(x['الشريك']||'').trim()===name);
   const profit=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='ربح'?Number(x['المبلغ'])||0:Number(x['ربح من العربيات'])||0),0);
   const deposits=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='إضافة'?Number(x['المبلغ'])||0:Number(x['الإضافة الكلية'])||0),0);
   const capital=Number(p['إجمالي المبلغ المسجل'])||0;
   const baseCapital=Number(p['رأس المال الأساسي'])||capital;
-
-  // النقدية خارج المساهمة تُحسب من الرصيد الرأسمالي الحالي الفعلي للشريك،
-  // ثم نضيف فقط الأرباح التي لم تُستهلك بسحوبات تجاوزت رأس المال الأساسي.
-  // هذا مهم لأن partners.capital في السحابة يحمل أثر السحوبات القديمة حتى
-  // لو كانت بعض حركات السحب التاريخية غير موجودة في partner_transactions.
   const withdrawals=mv.reduce((sum,x)=>sum+(String(x['نوع الحركة'])==='سحب'?Number(x['المبلغ'])||0:0),0);
-  // رأس المال الأساسي في هذا النظام يتضمن الإيداعات المسجلة بالفعل؛ لا نضيفها مرة أخرى.
-  // النقدية المتبقية هنا لا تغيّر finalBalance أو الخزنة أو لوحة رأس المال.
   const rightsBalance=Math.max(0,baseCapital+profit-withdrawals);
   const capitalNow=Math.max(0,capital);
   const withdrawnProfit=Math.max(0,withdrawals-baseCapital);
   const unwithdrawnProfit=Math.max(0,profit-withdrawnProfit);
   const finalBalance=Math.max(0,capitalNow+unwithdrawnProfit);
-  // قيمة غير المساهم الخاصة بالشريك قبل خصم الأقساط المباشرة العامة.
-  // الأقساط المباشرة نشاط منفصل وغير منسوبة لشريك بعينه، لذلك تُخصم مرة واحدة
-  // على إجمالي بطاقة غير المساهم في partnerCashOutsideContribution().
   const undistributed=Math.max(0,rightsBalance-invested);
-
   return {name,partnerId,capital,baseCapital,invested,undistributed,profit,deposits,withdrawals,finalBalance,currentCars,mv};
 }
 function renderProfits(){
