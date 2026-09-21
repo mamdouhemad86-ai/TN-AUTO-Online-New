@@ -1653,16 +1653,16 @@ async function returnSale(index){
 function additionalDepositModal(){
   const partners=A('الشركاء');
   if(!partners.length){alert('لا يوجد شركاء مسجلون');return;}
-  wp.innerHTML=partners.map(p=>`<option>${esc(p['الشريك'])}</option>`).join('');
+  wp.innerHTML=partners.map(p=>`<option value="${esc(p['الشريك']||p.name||'')}">${esc(p['الشريك']||p.name||'')}</option>`).join('');
   wd.value=new Date().toISOString().slice(0,10); wa.value=''; wst.value='إيداع إضافي لرأس المال'; wn.value='';
   wdBox.classList.remove('hidden');
   wdBox.querySelector('h2').textContent='💰 إيداع إضافي لشريك';
   wdBox.querySelector('.btn.primary').setAttribute('onclick','saveAdditionalDeposit()');
 }
 async function saveAdditionalDeposit(){
-  const partnerName=wp.value, amt=Number(wa.value)||0;
+  const partnerName=(wp.value||'').trim(), amt=Number(wa.value)||0;
   if(!partnerName||amt<=0){alert('اختار الشريك واكتب مبلغ الإيداع');return;}
-  const partner=A('الشركاء').find(p=>p['الشريك']===partnerName);
+  const partner=A('الشركاء').find(p=>(p['الشريك']||'').trim().toLowerCase()===partnerName.toLowerCase() || (p.name||'').trim().toLowerCase()===partnerName.toLowerCase());
   if(!partner){alert('الشريك غير موجود');return;}
   const date=wd.value||new Date().toISOString().slice(0,10);
 
