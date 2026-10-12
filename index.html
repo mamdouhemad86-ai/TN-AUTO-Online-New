@@ -884,7 +884,7 @@ function saveSalesExpected(carId){
   if(!tnIsManager())return alert('المدير فقط يقدر يحدد السعر المتوقع للبيع.');
   const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
   const input=document.getElementById('expected_'+carId); const expected=roundWhole(input?.value||0);
-  const m=salesMeta(c); m.expected=Math.max(0,expected); setSalesMeta(c,m); save(); if(flag)tnUpsertCustomerFromReservation(customer,phone); renderSalesPage(); if(typeof renderCustomersPage==='function')renderCustomersPage();
+  const m=salesMeta(c); m.expected=Math.max(0,expected); setSalesMeta(c,m); save(); renderSalesPage(); if(typeof renderCustomersPage==='function')renderCustomersPage();
   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتوقع للبيع';
 }
 function saveSalesAgreement(carId){
