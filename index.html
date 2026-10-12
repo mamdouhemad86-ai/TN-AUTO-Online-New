@@ -694,8 +694,7 @@ function deleteSecurityEmployee(id){
   if(!tnIsManager())return;
   const st=tnSecurityNormalize(); st.employees=st.employees.filter(e=>String(e.id)!==String(id)); tnSecuritySaveAndRender(st);
 }
-function tnEnsureAllowedLanding(){if(tnIsManager()||tnHas('dash'))return;const order=['sales','cars','requests','customers','showroom','reports','partners','contrib','cash','moves','refunds','directInstallments','profits','employees'];const target=order.find(k=>tnHas(k)&&document.getElementById(k));if(target)show(target);else{document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));const t=document.getElementById('title');if(t)t.textContent='لا توجد صفحات متاحة';}}
-function tnApplyPermissions(){const manager=tnIsManager();document.querySelectorAll('.nav button').forEach(b=>{const p=b.dataset.p;if(p==='settings')b.style.display=manager?'':'none';else b.style.display=tnHas(p)?'':'none'});document.querySelectorAll('[onclick]').forEach(el=>{const x=String(el.getAttribute('onclick')||'');let key=null;if(/\b(del|deleteSecurityEmployee)\s*\(/.test(x))key='delete';else if(/printCurrentReport/.test(x))key='print';else if(/showroom(Withdraw|Deposit|Expense)|withdrawModal|additionalDepositModal|saveCash|cashModal|directInstallmentModal|directInstallmentEdit|directPaymentModal|saveDirectInstallment|saveDirectPayment/.test(x))key='finance';else if(/modal\(/.test(x)&&/primary/.test(el.className))key='add';if(key&& !tnHas(key))el.style.display='none'});if(document.getElementById('settings')&&!tnHas('settings'))document.getElementById('settings').classList.add('hidden')}
+function tnApplyPermissions(){const manager=tnIsManager();document.querySelectorAll('.nav button').forEach(b=>{const p=b.dataset.p;if(p==='settings')b.style.display=manager?'':'none';else b.style.display=tnHas(p)?'':'none'});document.querySelectorAll('[onclick]').forEach(el=>{const x=String(el.getAttribute('onclick')||'');let key=null;if(/\b(del|deleteSecurityEmployee)\s*\(/.test(x))key='delete';else if(/printCurrentReport/.test(x))key='print';else if(/showroom(Withdraw|Deposit|Expense)|withdrawModal|additionalDepositModal|saveCash|cashModal|directInstallmentModal|directInstallmentEdit|directPaymentModal|saveDirectInstallment|saveDirectPayment/.test(x))key='finance';else if(/modal\(/.test(x)&&/primary/.test(el.className))key='add';if(key&& !tnHas(key))el.style.display='none'});if(document.getElementById('settings')&&!tnHas('settings'))document.getElementById('settings').classList.add('hidden');const active=document.querySelector('.page:not(.hidden)');if(active&&!tnHas(active.id)){const first=[...document.querySelectorAll('.nav button')].find(b=>tnHas(b.dataset.p));if(first){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));const target=document.getElementById(first.dataset.p);if(target)target.classList.remove('hidden');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b===first));if(typeof title!=='undefined'&&title)title.textContent=P[first.dataset.p];if(typeof renderAll==='function')renderAll()}}}
 function printCurrentReport(){
   const showroomOut=document.getElementById('showroomReportOutput');
   const showroomPage=document.getElementById('showroom');
@@ -889,7 +888,7 @@ function saveSalesExpected(carId){
   if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتوقع للبيع';
 }
 function saveSalesAgreement(carId){
-  if(!tnHas('reserve'))return alert('ليس لديك صلاحية حجز العربيات وتحديد السعر المتفق عليه.');
+  if(!tnHas('reserve'))return alert('ليس لديك صلاحية حجز العربيات.');
   const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
   const input=document.getElementById('agreed_'+carId); const agreed=roundWhole(input?.value||0);
   const m=salesMeta(c); m.agreed=Math.max(0,agreed); setSalesMeta(c,m); save(); renderSalesPage();
@@ -1051,6 +1050,49 @@ async function saveModalCore(){
  const vi={color:obj['اللون']||'',mileage:Number(obj['العداد'])||0,traffic:obj['المرور']||'',license:obj['الرخصة']||''};
  if(oldVehicle&&String(oldVehicle['ملاحظات']||'').includes('__TN_')){ /* preserve other internal sales markers while replacing vehicle info */ }
  setVehicleSalesInfo(obj,vi);
+ // Persist the vehicle first and use the database-generated ID for contributions.
+ // Never send local synthetic IDs as foreign keys to car_contributions.
+ if(onlineMode && sb){
+   try{
+     const oldCloudCar = !isNew ? (A('العربيات')[ctx.index]||null) : null;
+     const payload = {
+       name:String(obj['العربية']||''),
+       model:obj['الموديل']!=null&&obj['الموديل']!==''?String(obj['الموديل']):null,
+       year:Number(obj['السنة'])||null,
+       purchase_price:Number(obj['سعر الشراء'])||0,
+       purchase_commission:Number(obj['عمولة الشراء'])||0,
+       sale_price:Number(obj['سعر البيع'])||null,
+       sale_commission:Number(obj['عمولة البيع'])||0,
+       status:obj['حالة البيع']==='مباعة'?'sold':'available',
+       supplier:obj['مصدر العربية / المورد']||null,
+       supplier_phone:obj['رقم المورد']||null,
+       customer_name:obj['اسم العميل المشتري']||null,
+       customer_phone:obj['رقم تليفون العميل']||null,
+       notes:obj['ملاحظات']||null,
+       purchased_at:obj['تاريخ الشراء']||null,
+       sold_at:obj['تاريخ البيع']||null
+     };
+     let cloudCar, carErr;
+     if(isNew){
+       ({data:cloudCar,error:carErr}=await sb.from('cars').insert(payload).select('*').single());
+     }else{
+       const cloudId=Number(oldCloudCar?.__cloud_id||oldCloudCar?.id);
+       if(!Number.isFinite(cloudId)||cloudId<=0) throw new Error('معرّف العربية غير صالح للتعديل أونلاين.');
+       ({data:cloudCar,error:carErr}=await sb.from('cars').update(payload).eq('id',cloudId).select('*').single());
+     }
+     if(carErr) throw carErr;
+     if(!cloudCar?.id) throw new Error('قاعدة البيانات لم تُرجع رقم العربية بعد الحفظ.');
+     obj.id=Number(cloudCar.id);
+     obj.__cloud_id=Number(cloudCar.id);
+     window.__tnCarCloudSaved=true;
+   }catch(e){
+     window.__tnCarCloudSaved=false;
+     console.error('Cloud car save error',e);
+     alert('لم يتم حفظ العربية على السحابة، لذلك لم تُحفظ مساهماتها أو حركاتها.\n\n'+(e.message||e));
+     return;
+   }
+ }
+
  // Keep pending contributions available to the later partner/accounting and cloud-save steps.
 }
  if(ctx.type==='car'){
@@ -1188,7 +1230,7 @@ async function saveModalCore(){
    // Otherwise rebuildCarContributions() sees the old car's contribution string,
    // and the later generic sync can overwrite the freshly saved cloud rows with stale values.
    if(isNew){
-     if(!obj.id) obj.id=nextLocalId('العربيات');
+     if(!(onlineMode && sb) && !obj.id) obj.id=nextLocalId('العربيات');
      a.push(obj);
    }else{
      obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet);
@@ -1197,9 +1239,15 @@ async function saveModalCore(){
    rebuildCarContributions();
    if(onlineMode && sb){
      try{
-       const savedCar=A('العربيات')[ctx.index];
-       const carId=Number(obj.id||savedCar?.id)||0;
+       const savedCar=isNew?A('العربيات').find(c=>Number(c.id)===Number(obj.id)):A('العربيات')[ctx.index];
+       const carId=Number(obj.__cloud_id||obj.id||savedCar?.id)||0;
+       if(!carId) throw new Error('لم يتم تأكيد رقم العربية من السحابة؛ تم إيقاف حفظ المساهمات.');
        await saveCarContributionsOnline(carId,pendingCarContributions||[]);
+       delete obj.__cloud_id;
+       delete obj.__pendingCarContributions;
+       delete obj.__TN_FUNDING_TYPE;
+       delete obj.__TN_PARTNER_FUNDED;
+       delete obj.__TN_SHOWROOM_FUNDED;
        const partnerPaid=(pendingCarContributions||[]).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
        const remainingToPurchase=Math.max(0,Number(obj['سعر الشراء'])||0)-partnerPaid;
        if(remainingToPurchase>0.01){
@@ -1209,7 +1257,12 @@ async function saveModalCore(){
        }
      }catch(e){
        console.error('Cloud car contributions save error',e);
-       alert('تم تعديل المساهمات محليًا لكن تعذر حفظها أونلاين. لم يتم اعتماد التعديل على السحابة.\n\n'+(e.message||e));
+       // The car row may already exist in the cloud. Preserve its real ID locally
+       // and switch the open modal to edit mode so retry updates this row instead
+       // of inserting a duplicate car.
+       const persistedIndex=A('العربيات').findIndex(c=>Number(c.id)===Number(obj.__cloud_id||obj.id));
+       if(persistedIndex>=0){ctx.index=persistedIndex;obj.id=Number(A('العربيات')[persistedIndex].id);save(false);}
+       alert('العربية قد تكون اتحفظت على السحابة، لكن مساهماتها لم تُحفظ. احتفظنا برقم العربية لتجنب تكرارها؛ صحّح المساهمات ثم جرّب الحفظ مرة واحدة.\n\n'+(e.message||e));
        return;
      }
    }
@@ -2104,7 +2157,7 @@ document.addEventListener('click',function(e){const el=e.target.closest('[onclic
         const emp=tnSecurityLoad().employees.find(e=>e.id===role&&e.active!==false);
         const hash=await tnHash(password);
         if(!emp||hash!==emp.passwordHash)throw new Error('Employee login failed');
-        window.__tnRole='employee'; window.__tnEmployeeId=emp.id; sessionStorage.setItem('TN_AUTO_ACTIVE_SESSION','1'); sessionStorage.setItem('TN_AUTO_ROLE','employee'); sessionStorage.setItem('TN_AUTO_EMPLOYEE_ID',String(emp.id)); localStorage.removeItem('TN_AUTO_FORCE_LOGIN'); screen.remove(); document.body.classList.remove('tn-auth-locked'); tnApplyPermissions(); tnEnsureAllowedLanding(); return;
+        window.__tnRole='employee'; window.__tnEmployeeId=emp.id; sessionStorage.setItem('TN_AUTO_ACTIVE_SESSION','1'); sessionStorage.setItem('TN_AUTO_ROLE','employee'); sessionStorage.setItem('TN_AUTO_EMPLOYEE_ID',String(emp.id)); localStorage.removeItem('TN_AUTO_FORCE_LOGIN'); screen.remove(); document.body.classList.remove('tn-auth-locked'); tnApplyPermissions(); return;
       }
       const { data, error } = await sb.auth.signInWithPassword({email: LOGIN_EMAIL,password: password});
       if (error || !data.session) throw error || new Error('Login failed');
