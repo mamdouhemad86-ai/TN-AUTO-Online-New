@@ -880,12 +880,34 @@ function renderSalesPage(){
     </div>`;
   }).join('');
 }
-function saveSalesExpected(carId){
+async function saveSalesExpected(carId){
   if(!tnIsManager())return alert('المدير فقط يقدر يحدد السعر المتوقع للبيع.');
   const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
-  const input=document.getElementById('expected_'+carId); const expected=roundWhole(input?.value||0);
-  const m=salesMeta(c); m.expected=Math.max(0,expected); setSalesMeta(c,m); save(); renderSalesPage(); if(typeof renderCustomersPage==='function')renderCustomersPage();
-  if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتوقع للبيع';
+  const input=document.getElementById('expected_'+carId);
+  const raw=String(input?.value??'').replace(/,/g,'').trim();
+  const expected=roundWhole(raw||0);
+  if(raw!=='' && (!Number.isFinite(Number(raw)) || Number(raw)<0))return alert('اكتب سعرًا صحيحًا.');
+  const m=salesMeta(c); m.expected=Math.max(0,expected); setSalesMeta(c,m);
+  save(false);
+  renderSalesPage(); if(typeof renderCustomersPage==='function')renderCustomersPage();
+  if(!onlineMode || !sb){
+    if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ على هذا الجهاز فقط — لا يوجد اتصال بالسحابة';
+    return alert('تم حفظ السعر على هذا الجهاز فقط، لكن الاتصال بالسحابة غير متاح.');
+  }
+  try{
+    clearTimeout(cloudSyncTimer);
+    await syncLocalToCloud();
+    const {data:row,error}=await sb.from('cars').select('id,notes').eq('id',Number(carId)).maybeSingle();
+    if(error)throw error;
+    const stored=salesMeta({'ملاحظات':row?.notes||''}).expected;
+    if(stored!==Math.max(0,expected))throw new Error('السحابة لم تُرجع السعر المتوقع بالقيمة التي تم إدخالها.');
+    if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتوقع في السحابة وتأكيده';
+    alert('تم حفظ السعر المتوقع في السحابة بنجاح.');
+  }catch(e){
+    console.error('saveSalesExpected cloud save failed:',e);
+    if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ السعر المتوقع في السحابة';
+    alert('السعر اتسجل على هذا الجهاز، لكن لم نتمكن من تأكيد حفظه في السحابة. لا تغلق الصفحة قبل مراجعة الاتصال.\n\n'+(e?.message||e));
+  }
 }
 function saveSalesAgreement(carId){
   if(!tnHas('reserve'))return alert('ليس لديك صلاحية حجز العربيات.');
