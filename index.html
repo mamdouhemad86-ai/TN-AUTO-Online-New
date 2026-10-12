@@ -1046,6 +1046,48 @@ async function saveModalCore(){
  obj.__TN_FUNDING_TYPE=__purchaseFunding.type;
  obj.__TN_PARTNER_FUNDED=__purchaseFunding.partnerFunded;
  obj.__TN_SHOWROOM_FUNDED=__purchaseFunding.showroomFunded;
+ // Persist the vehicle first and use the database-generated ID for contributions.
+ // Never send local synthetic IDs as foreign keys to car_contributions.
+ if(onlineMode && sb){
+   try{
+     const oldCloudCar = !isNew ? (A('العربيات')[ctx.index]||null) : null;
+     const payload = {
+       name:String(obj['العربية']||''),
+       model:obj['الموديل']!=null&&obj['الموديل']!==''?String(obj['الموديل']):null,
+       year:Number(obj['السنة'])||null,
+       purchase_price:Number(obj['سعر الشراء'])||0,
+       purchase_commission:Number(obj['عمولة الشراء'])||0,
+       sale_price:Number(obj['سعر البيع'])||null,
+       sale_commission:Number(obj['عمولة البيع'])||0,
+       status:obj['حالة البيع']==='مباعة'?'sold':'available',
+       supplier:obj['مصدر العربية / المورد']||null,
+       supplier_phone:obj['رقم المورد']||null,
+       customer_name:obj['اسم العميل المشتري']||null,
+       customer_phone:obj['رقم تليفون العميل']||null,
+       notes:obj['ملاحظات']||null,
+       purchased_at:obj['تاريخ الشراء']||null,
+       sold_at:obj['تاريخ البيع']||null
+     };
+     let cloudCar, carErr;
+     if(isNew){
+       ({data:cloudCar,error:carErr}=await sb.from('cars').insert(payload).select('*').single());
+     }else{
+       const cloudId=Number(oldCloudCar?.__cloud_id||oldCloudCar?.id);
+       if(!Number.isFinite(cloudId)||cloudId<=0) throw new Error('معرّف العربية غير صالح للتعديل أونلاين.');
+       ({data:cloudCar,error:carErr}=await sb.from('cars').update(payload).eq('id',cloudId).select('*').single());
+     }
+     if(carErr) throw carErr;
+     if(!cloudCar?.id) throw new Error('قاعدة البيانات لم تُرجع رقم العربية بعد الحفظ.');
+     obj.id=Number(cloudCar.id);
+     obj.__cloud_id=Number(cloudCar.id);
+     window.__tnCarCloudSaved=true;
+   }catch(e){
+     window.__tnCarCloudSaved=false;
+     console.error('Cloud car save error',e);
+     alert('لم يتم حفظ العربية على السحابة، لذلك لم تُحفظ مساهماتها أو حركاتها.\n\n'+(e.message||e));
+     return;
+   }
+ }
  const oldVehicle=A('العربيات')[ctx.index];
  const vi={color:obj['اللون']||'',mileage:Number(obj['العداد'])||0,traffic:obj['المرور']||'',license:obj['الرخصة']||''};
  if(oldVehicle&&String(oldVehicle['ملاحظات']||'').includes('__TN_')){ /* preserve other internal sales markers while replacing vehicle info */ }
@@ -1187,7 +1229,7 @@ async function saveModalCore(){
    // Otherwise rebuildCarContributions() sees the old car's contribution string,
    // and the later generic sync can overwrite the freshly saved cloud rows with stale values.
    if(isNew){
-     if(!obj.id) obj.id=nextLocalId('العربيات');
+     if(!(onlineMode && sb) && !obj.id) obj.id=nextLocalId('العربيات');
      a.push(obj);
    }else{
      obj.id=obj.id||a[ctx.index]?.id||nextLocalId(ctx.sheet);
@@ -1196,9 +1238,15 @@ async function saveModalCore(){
    rebuildCarContributions();
    if(onlineMode && sb){
      try{
-       const savedCar=A('العربيات')[ctx.index];
-       const carId=Number(obj.id||savedCar?.id)||0;
+       const savedCar=isNew?A('العربيات').find(c=>Number(c.id)===Number(obj.id)):A('العربيات')[ctx.index];
+       const carId=Number(obj.__cloud_id||obj.id||savedCar?.id)||0;
+       if(!carId) throw new Error('لم يتم تأكيد رقم العربية من السحابة؛ تم إيقاف حفظ المساهمات.');
        await saveCarContributionsOnline(carId,pendingCarContributions||[]);
+       delete obj.__cloud_id;
+       delete obj.__pendingCarContributions;
+       delete obj.__TN_FUNDING_TYPE;
+       delete obj.__TN_PARTNER_FUNDED;
+       delete obj.__TN_SHOWROOM_FUNDED;
        const partnerPaid=(pendingCarContributions||[]).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
        const remainingToPurchase=Math.max(0,Number(obj['سعر الشراء'])||0)-partnerPaid;
        if(remainingToPurchase>0.01){
@@ -1208,7 +1256,12 @@ async function saveModalCore(){
        }
      }catch(e){
        console.error('Cloud car contributions save error',e);
-       alert('تم تعديل المساهمات محليًا لكن تعذر حفظها أونلاين. لم يتم اعتماد التعديل على السحابة.\n\n'+(e.message||e));
+       // The car row may already exist in the cloud. Preserve its real ID locally
+       // and switch the open modal to edit mode so retry updates this row instead
+       // of inserting a duplicate car.
+       const persistedIndex=A('العربيات').findIndex(c=>Number(c.id)===Number(obj.__cloud_id||obj.id));
+       if(persistedIndex>=0){ctx.index=persistedIndex;obj.id=Number(A('العربيات')[persistedIndex].id);save(false);}
+       alert('العربية قد تكون اتحفظت على السحابة، لكن مساهماتها لم تُحفظ. احتفظنا برقم العربية لتجنب تكرارها؛ صحّح المساهمات ثم جرّب الحفظ مرة واحدة.\n\n'+(e.message||e));
        return;
      }
    }
