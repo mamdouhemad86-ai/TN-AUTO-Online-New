@@ -1046,6 +1046,10 @@ async function saveModalCore(){
  obj.__TN_FUNDING_TYPE=__purchaseFunding.type;
  obj.__TN_PARTNER_FUNDED=__purchaseFunding.partnerFunded;
  obj.__TN_SHOWROOM_FUNDED=__purchaseFunding.showroomFunded;
+ const oldVehicle=A('العربيات')[ctx.index];
+ const vi={color:obj['اللون']||'',mileage:Number(obj['العداد'])||0,traffic:obj['المرور']||'',license:obj['الرخصة']||''};
+ if(oldVehicle&&String(oldVehicle['ملاحظات']||'').includes('__TN_')){ /* preserve other internal sales markers while replacing vehicle info */ }
+ setVehicleSalesInfo(obj,vi);
  // Persist the vehicle first and use the database-generated ID for contributions.
  // Never send local synthetic IDs as foreign keys to car_contributions.
  if(onlineMode && sb){
@@ -1088,10 +1092,7 @@ async function saveModalCore(){
      return;
    }
  }
- const oldVehicle=A('العربيات')[ctx.index];
- const vi={color:obj['اللون']||'',mileage:Number(obj['العداد'])||0,traffic:obj['المرور']||'',license:obj['الرخصة']||''};
- if(oldVehicle&&String(oldVehicle['ملاحظات']||'').includes('__TN_')){ /* preserve other internal sales markers while replacing vehicle info */ }
- setVehicleSalesInfo(obj,vi);
+
  // Keep pending contributions available to the later partner/accounting and cloud-save steps.
 }
  if(ctx.type==='car'){
