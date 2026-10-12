@@ -882,31 +882,39 @@ function renderSalesPage(){
 }
 async function saveSalesExpected(carId){
   if(!tnIsManager())return alert('المدير فقط يقدر يحدد السعر المتوقع للبيع.');
-  const c=A('العربيات').find(x=>Number(x.id)===Number(carId)); if(!c)return alert('العربية غير موجودة.');
+  const c=A('العربيات').find(x=>Number(x.id)===Number(carId));
+  if(!c)return alert('العربية غير موجودة.');
   const input=document.getElementById('expected_'+carId);
   const raw=String(input?.value??'').replace(/,/g,'').trim();
+  if(raw!=='' && (!Number.isFinite(Number(raw)) || Number(raw)<0))return alert('اكتب سعرًا صحيحًا غير سالب.');
   const expected=roundWhole(raw||0);
-  if(raw!=='' && (!Number.isFinite(Number(raw)) || Number(raw)<0))return alert('اكتب سعرًا صحيحًا.');
-  const m=salesMeta(c); m.expected=Math.max(0,expected); setSalesMeta(c,m);
+  const oldNotes=String(c['ملاحظات']||'');
+  const m=salesMeta(c);
+  m.expected=Math.max(0,expected);
+  setSalesMeta(c,m);
   save(false);
-  renderSalesPage(); if(typeof renderCustomersPage==='function')renderCustomersPage();
   if(!onlineMode || !sb){
-    if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ على هذا الجهاز فقط — لا يوجد اتصال بالسحابة';
-    return alert('تم حفظ السعر على هذا الجهاز فقط، لكن الاتصال بالسحابة غير متاح.');
+    renderSalesPage();
+    if(typeof sysStatus!=='undefined')sysStatus.textContent='تم الحفظ محليًا فقط — السحابة غير متاحة';
+    return alert('تم حفظ السعر على هذا الجهاز فقط؛ الاتصال بالسحابة غير متاح، لذلك لم نؤكد الحفظ أونلاين.');
   }
   try{
-    clearTimeout(cloudSyncTimer);
-    await syncLocalToCloud();
-    const {data:row,error}=await sb.from('cars').select('id,notes').eq('id',Number(carId)).maybeSingle();
+    const notes=String(c['ملاحظات']||'')||null;
+    const {data,error}=await sb.from('cars').update({notes}).eq('id',Number(c.id)).select('id,notes').maybeSingle();
     if(error)throw error;
-    const stored=salesMeta({'ملاحظات':row?.notes||''}).expected;
-    if(stored!==Math.max(0,expected))throw new Error('السحابة لم تُرجع السعر المتوقع بالقيمة التي تم إدخالها.');
-    if(typeof sysStatus!=='undefined')sysStatus.textContent='تم حفظ السعر المتوقع في السحابة وتأكيده';
-    alert('تم حفظ السعر المتوقع في السحابة بنجاح.');
+    if(!data)throw new Error('لم تُرجع السحابة سجل العربية بعد التحديث؛ تحقق من الصلاحيات ومعرّف العربية.');
+    const saved=salesMeta({'ملاحظات':data.notes||''}).expected;
+    if(saved!==expected)throw new Error('القيمة التي رجعت من السحابة ('+saved+') لا تطابق القيمة المدخلة ('+expected+').');
+    if(typeof renderCustomersPage==='function')renderCustomersPage();
+    renderSalesPage();
+    if(typeof sysStatus!=='undefined')sysStatus.textContent='تم تأكيد حفظ السعر المتوقع في السحابة ✓';
+    alert('تم حفظ السعر المتوقع في السحابة والتأكد من مطابقته ✓');
   }catch(e){
-    console.error('saveSalesExpected cloud save failed:',e);
+    c['ملاحظات']=oldNotes;
+    save(false);
+    renderSalesPage();
     if(typeof sysStatus!=='undefined')sysStatus.textContent='فشل حفظ السعر المتوقع في السحابة';
-    alert('السعر اتسجل على هذا الجهاز، لكن لم نتمكن من تأكيد حفظه في السحابة. لا تغلق الصفحة قبل مراجعة الاتصال.\n\n'+(e?.message||e));
+    alert('لم يتم تأكيد حفظ السعر المتوقع في السحابة.\n\n'+(e?.message||String(e))+'\n\nاحتفظنا بالقيمة السابقة محليًا ولم نعرض رسالة نجاح.');
   }
 }
 function saveSalesAgreement(carId){
